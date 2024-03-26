@@ -25,4 +25,4 @@ bin
 
 # Go workspace file
 go.work
-go_api.code-workspace
+*.code-workspace
