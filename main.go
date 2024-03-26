@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strings"
 )
 
 func main() {
@@ -87,8 +89,24 @@ func runCode(code string) (string, error) {
 	cmd.Stderr = &stderr
 	err = cmd.Run()
 	if err != nil {
-		return "", fmt.Errorf("error running code: %v\n%s", err, stderr.String())
+		errorMessage := parseGoError(stderr.String())
+		if errorMessage != "" {
+			return "", fmt.Errorf("%s\nError: error running code: %v", errorMessage, err)
+		}
+		return "", nil
+	} else {
+		return stdout.String(), nil
 	}
+}
 
-	return stdout.String(), nil
+func parseGoError(stderr string) string {
+	re := regexp.MustCompile(`(?m)^\S+:(\d+):(\d+):\s+(.*)$`)
+	lines := strings.Split(stderr, "\n")
+	for _, line := range lines {
+		match := re.FindStringSubmatch(line)
+		if len(match) > 0 {
+			return strings.TrimSpace(match[len(match)-1])
+		}
+	}
+	return ""
 }
