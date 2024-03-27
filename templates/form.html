@@ -2,9 +2,15 @@
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="description" content="Go playground">
+  	<meta name="keywords" content="Go, Playground">
+  	<meta name="author" content="AlexandruC0909">
+  	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Go Playground</title>
 	<style>
+		body {
+		  background-color: #f0f0f0; 
+		}
 		#code-container {
 			display: flex;
 		}
@@ -13,7 +19,7 @@
 			max-height: 400px;
 			min-height: 400px;
 			width: 20px;
-			padding: 3px 5px;
+			margin: 31px 5px;
 			font-size: 12px;
 			font-family: monospace;
 		}
@@ -25,12 +31,27 @@
 			min-height: 400px;
 			overflow: auto;
 		}
+		#output {
+			margin-top: 28px;
+			min-height: 400px;
+		}
+		.button {
+			height: 40px;
+			margin: 28px 10px;
+		}
+		label {
+  			display: block;
+  			margin-bottom: 10px;
+		}
+
 	</style>
 </head>
 <body>
 	<div id="code-container">
 		<div id="line-numbers" class="scrollSync"></div>
-		<textarea id="code"  class="scrollSync" rows="10" cols="50">
+		<div>
+			<label for="code">Go Playground :</label>
+			<textarea id="code"  name="code" class="scrollSync" rows="10" cols="50">
 package main
 
 import "fmt"
@@ -38,17 +59,17 @@ import "fmt"
 func main() {
 	fmt.Println("Hello, World!")
 }
-		</textarea>
+			</textarea>
+		</div>
+		<button onclick="runCode()" class="button">Run</button>
+		<pre id="output"></pre>
 	</div>
-	<button onclick="runCode()">Run</button>
-	<pre id="output"></pre>
-
+	
 	<script>
 		window.onload = function() {
 			var code = document.getElementById("code");
 			var lineNumbers = document.getElementById("line-numbers");
 
-			// Function to update line numbers
 			function updateLineNumbers() {
 				lineNumbers.innerHTML = "";
 				var lines = code.value.split("\n");
@@ -58,11 +79,7 @@ func main() {
 					lineNumbers.appendChild(span);
 				}
 			}
-
-			// Add initial line numbers
 			updateLineNumbers();
-
-			// Update line numbers on code change
 			code.addEventListener("input", function() {
 				updateLineNumbers();
 			});

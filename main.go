@@ -36,6 +36,7 @@ func main() {
 		}
 		fmt.Fprintln(w, output)
 	})
+	http.HandleFunc("/robots.txt", robotsHandler)
 
 	http.ListenAndServe(":8080", nil)
 }
@@ -110,4 +111,10 @@ func parseGoError(stderr string) string {
 		}
 	}
 	return ""
+}
+
+func robotsHandler(w http.ResponseWriter, r *http.Request) {
+	robotsTxt := []byte("User-agent: *\nDisallow: /private/")
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write(robotsTxt)
 }
