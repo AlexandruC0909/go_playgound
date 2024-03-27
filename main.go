@@ -3,57 +3,28 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"html/template"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/AlexandruC0909/playground/templates"
 )
 
 func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Render the code editor and output area
-		fmt.Fprintln(w, `<!DOCTYPE html>
-		<html lang="en">
-		<head>
-			<meta charset="UTF-8">
-			<meta name="viewport" content="width=device-width, initial-scale=1.0">
-			<title>Go Playground</title>
-		</head>
-		<body>
-			<textarea id="code" rows="10" cols="50">package main
-		
-		import "fmt"
-		
-		func main() {
-			fmt.Println("Hello, World!")
-		}</textarea>
-			<button onclick="runCode()">Run</button>
-			<pre id="output"></pre>
-		
-			<script>
-				function runCode() {
-					var code = document.getElementById("code").value;
-		
-					var xhr = new XMLHttpRequest();
-					xhr.open("POST", "/run", true);
-					xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-					xhr.onreadystatechange = function() {
-						if (xhr.readyState === XMLHttpRequest.DONE) {
-							if (xhr.status === 200) {
-								document.getElementById("output").textContent = xhr.responseText;
-							} else {
-								document.getElementById("output").textContent = "Error: " + xhr.responseText;
-							}
-						}
-					};
-					xhr.send("code=" + encodeURIComponent(code));
-				}
-			</script>
-		</body>
-		</html>
-		`)
+		tmpl, err := template.ParseFS(templates.Templates, "form.html")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		err = tmpl.Execute(w, nil)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	})
 
 	http.HandleFunc("/run", func(w http.ResponseWriter, r *http.Request) {
@@ -70,15 +41,26 @@ func main() {
 }
 
 func runCode(code string) (string, error) {
-	tempDir, err := os.MkdirTemp("", "goplayground")
+	if !validateGoCode(code) {
+		return "", fmt.Errorf("invalid Go code")
+	}
 
+	tempDir, err := os.MkdirTemp("", "goplayground")
 	if err != nil {
 		return "", err
 	}
 	defer os.RemoveAll(tempDir)
 
+	files, err := os.ReadDir(tempDir)
+	if err != nil {
+		return "", err
+	}
+	if len(files) != 0 {
+		return "", fmt.Errorf("temporary directory is not empty")
+	}
+
 	tempFile := filepath.Join(tempDir, "main.go")
-	err = os.WriteFile(tempFile, []byte(code), 0644)
+	err = os.WriteFile(tempFile, []byte(code), 0600)
 	if err != nil {
 		return "", err
 	}
@@ -97,6 +79,25 @@ func runCode(code string) (string, error) {
 	} else {
 		return stdout.String(), nil
 	}
+}
+
+func validateGoCode(code string) bool {
+	disallowed := []string{
+		`import\s+"os/exec"`,
+		`import\s+"net/http"`,
+		`\bos\.Exec\b`,
+		`\bos\.Setenv\b`,
+		`\bfile\.Open\b`,
+	}
+
+	for _, pattern := range disallowed {
+		match, _ := regexp.MatchString(pattern, code)
+		if match {
+			return false
+		}
+	}
+
+	return true
 }
 
 func parseGoError(stderr string) string {
