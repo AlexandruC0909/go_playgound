@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -71,14 +70,15 @@ func main() {
 }
 
 func runCode(code string) (string, error) {
-	tempDir, err := ioutil.TempDir("", "goplayground")
+	tempDir, err := os.MkdirTemp("", "goplayground")
+
 	if err != nil {
 		return "", err
 	}
 	defer os.RemoveAll(tempDir)
 
 	tempFile := filepath.Join(tempDir, "main.go")
-	err = ioutil.WriteFile(tempFile, []byte(code), 0644)
+	err = os.WriteFile(tempFile, []byte(code), 0644)
 	if err != nil {
 		return "", err
 	}
