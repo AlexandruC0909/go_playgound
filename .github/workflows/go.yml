@@ -24,11 +24,21 @@ jobs:
     - name: Build
       run: go build -v ./...
 
-    - name: Test
-      run: go test -v ./...
+    - name: Run Tests
+        run: go test -coverpkg=./... -race -coverprofile=coverage.out -covermode=atomic ./...
+
+    - name: Check for coverage.out in any directory
+      run: |
+        found_file=$(find . -name "coverage.out" -print -quit)
+        if [ -n "$found_file" ]; then
+          echo "coverage.out exists in at least one directory at location: $found_file"
+        else
+          echo "coverage.out does not exist in any directory"
+          # You can add additional debugging information or commands here
+        fi
     
     - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@v4.0.1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        slug: AlexandruC0909/go_playgound
+      uses: codecov/codecov-action@v3
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
