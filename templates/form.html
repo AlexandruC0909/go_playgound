@@ -1,57 +1,56 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-	<meta charset="UTF-8">
-	<meta name="description" content="Go playground">
-  	<meta name="keywords" content="Go, Playground">
-  	<meta name="author" content="AlexandruC0909">
-  	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Go Playground</title>
-	<style>
-		body {
-		  background-color: #f0f0f0; 
-		}
-		#code-container {
-			display: flex;
-		}
-		#line-numbers {
-			overflow-y: hidden;
-			max-height: 400px;
-			min-height: 400px;
-			width: 20px;
-			margin: 31px 5px;
-			font-size: 12px;
-			font-family: monospace;
-		}
-		#code {
-			max-height: 400px;
-			border: 1px solid #ccc;
-			font-size: 12px;
-			font-family: monospace;
-			min-height: 400px;
-			overflow: auto;
-		}
-		#output {
-			margin-top: 28px;
-			min-height: 400px;
-		}
-		.button {
-			height: 40px;
-			margin: 28px 10px;
-		}
-		label {
-  			display: block;
-  			margin-bottom: 10px;
-		}
-
-	</style>
-</head>
-<body>
-	<div id="code-container">
-		<div id="line-numbers" class="scrollSync"></div>
-		<div>
-			<label for="code">Go Playground :</label>
-			<textarea id="code"  name="code" class="scrollSync" rows="10" cols="50">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content="Go playground" />
+    <meta name="keywords" content="Go, Playground" />
+    <meta name="author" content="AlexandruC0909" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Go Playground</title>
+    <style>
+      body {
+        background-color: #f0f0f0;
+      }
+      #code-container {
+      	display: flex;
+      }
+      #line-numbers {
+      	overflow-y: hidden;
+      	max-height: 400px;
+      	min-height: 400px;
+      	width: 20px;
+      	margin: 31px 5px;
+      	font-size: 12px;
+      	font-family: monospace;
+      }
+      #code {
+      	max-height: 400px;
+      	border: 1px solid #ccc;
+      	font-size: 12px;
+      	font-family: monospace;
+      	min-height: 400px;
+      	overflow: auto;
+      }
+      #output {
+      	margin-top: 28px;
+      	min-height: 400px;
+      }
+      .button {
+      	height: 40px;
+      	margin: 28px 10px;
+      }
+      label {
+      			display: block;
+      			margin-bottom: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="code-container">
+      <div id="line-numbers" class="scrollSync"></div>
+      <div>
+        <label for="code">Go Playground :</label>
+        <textarea id="code" name="code" class="scrollSync" rows="10" cols="50">
 package main
 
 import "fmt"
@@ -59,62 +58,65 @@ import "fmt"
 func main() {
 	fmt.Println("Hello, World!")
 }
-			</textarea>
-		</div>
-		<button onclick="runCode()" class="button">Run</button>
-		<pre id="output"></pre>
-	</div>
-	
-	<script>
-		window.onload = function() {
-			var code = document.getElementById("code");
-			var lineNumbers = document.getElementById("line-numbers");
+			</textarea
+        >
+      </div>
+      <button onclick="runCode()" class="button">Run</button>
+      <pre id="output"></pre>
+    </div>
 
-			function updateLineNumbers() {
-				lineNumbers.innerHTML = "";
-				var lines = code.value.split("\n");
-				for (var i = 1; i <= lines.length; i++) {
-					var span = document.createElement("div");
-					span.textContent = i;
-					lineNumbers.appendChild(span);
-				}
-			}
-			updateLineNumbers();
-			code.addEventListener("input", function() {
-				updateLineNumbers();
-			});
-		};
+    <script>
+      window.onload = function () {
+        var code = document.getElementById("code");
+        var lineNumbers = document.getElementById("line-numbers");
 
-		function runCode() {
-			var code = document.getElementById("code").value;
+        function updateLineNumbers() {
+          lineNumbers.innerHTML = "";
+          var lines = code.value.split("\n");
+          for (var i = 1; i <= lines.length; i++) {
+            var span = document.createElement("div");
+            span.textContent = i;
+            lineNumbers.appendChild(span);
+          }
+        }
+        updateLineNumbers();
+        code.addEventListener("input", function () {
+          updateLineNumbers();
+        });
+      };
 
-			var xhr = new XMLHttpRequest();
-			xhr.open("POST", "/run", true);
-			xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-			xhr.onreadystatechange = function() {
-				if (xhr.readyState === XMLHttpRequest.DONE) {
-					if (xhr.status === 200) {
-						document.getElementById("output").textContent = xhr.responseText;
-					} else {
-						document.getElementById("output").textContent = "Error: " + xhr.responseText;
-					}
-				}
-			};
-			xhr.send("code=" + encodeURIComponent(code));
-		}
+      function runCode() {
+        var code = document.getElementById("code").value;
 
-		const scrollElements = document.querySelectorAll(".scrollSync");
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "/run", true);
+        xhr.setRequestHeader(
+          "Content-Type",
+          "application/x-www-form-urlencoded"
+        );
+        xhr.onreadystatechange = function () {
+          if (xhr.readyState === XMLHttpRequest.DONE) {
+            if (xhr.status === 200) {
+              document.getElementById("output").textContent = xhr.responseText;
+            } else {
+              document.getElementById("output").textContent =
+                "Error: " + xhr.responseText;
+            }
+          }
+        };
+        xhr.send("code=" + encodeURIComponent(code));
+      }
 
-		scrollElements.forEach(div => div.addEventListener( 'scroll', e => {
-		
-		  scrollElements.forEach(d => {
-		
-		    d.scrollTop = div.scrollTop;
-		    d.scrollLeft = div.scrollLeft;
-		
-		  });
+      const scrollElements = document.querySelectorAll(".scrollSync");
 
-		}) );
-	</script>
-</body>
+      scrollElements.forEach((div) =>
+        div.addEventListener("scroll", (e) => {
+          scrollElements.forEach((d) => {
+            d.scrollTop = div.scrollTop;
+            d.scrollLeft = div.scrollLeft;
+          });
+        })
+      );
+    </script>
+  </body>
 </html>
