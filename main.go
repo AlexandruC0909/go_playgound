@@ -41,6 +41,7 @@ type RateLimiter struct {
 }
 
 var containerID string
+var localClient *client.Client
 
 func NewRateLimiter() *RateLimiter {
 	return &RateLimiter{
@@ -116,7 +117,6 @@ func createContainer() {
 	if err != nil {
 		panic(fmt.Errorf("failed to create Docker client: %v", err))
 	}
-	defer cli.Close()
 
 	// Check if the container already exists
 	_, err = cli.ContainerInspect(ctx, containerName)
@@ -161,7 +161,7 @@ func createContainer() {
 	}
 
 	containerID = resp.ID
-
+	localClient = cli
 }
 
 func handleRun(w http.ResponseWriter, r *http.Request) {
@@ -282,20 +282,14 @@ func runCode(code string) (string, error) {
 	}
 
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv)
-	if err != nil {
-		return "", fmt.Errorf("failed to create Docker client: %v", err)
-	}
-	defer cli.Close()
-
+	defer localClient.Close()
 	// Copy code into the existing container
 
 	tar := createTarFromFile(tempFile)
-	if err := cli.CopyToContainer(ctx, containerName, "/code", tar, container.CopyToContainerOptions{}); err != nil {
+	if err := localClient.CopyToContainer(ctx, containerName, "/code", tar, container.CopyToContainerOptions{}); err != nil {
 		return "", fmt.Errorf("failed to copy code to container: %v", err)
 	}
 
-	// Run the code multiple times in the same container
 	// Execute the command in the running container
 	execConfig := container.ExecOptions{
 		Cmd:          []string{"go", "run", "/code/main.go"},
@@ -304,13 +298,13 @@ func runCode(code string) (string, error) {
 		AttachStderr: true,
 	}
 
-	execResp, err := cli.ContainerExecCreate(ctx, containerID, execConfig)
+	execResp, err := localClient.ContainerExecCreate(ctx, containerID, execConfig)
 	if err != nil {
 		return "", fmt.Errorf("failed to create exec: %v", err)
 	}
 
 	// Start the exec instance
-	response, err := cli.ContainerExecAttach(ctx, execResp.ID, types.ExecStartCheck{})
+	response, err := localClient.ContainerExecAttach(ctx, execResp.ID, types.ExecStartCheck{})
 	if err != nil {
 		return "", fmt.Errorf("failed to attach to exec: %v", err)
 	}
