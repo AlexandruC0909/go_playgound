@@ -23,13 +23,13 @@ import (
 )
 
 const (
-	timeoutSeconds    = 10
-	memoryLimit       = 50 * 1024 * 1024 // 50MB
+	timeoutSeconds    = 100
+	memoryLimit       = 150 * 1024 * 1024 // 50MB
 	dockerImage       = "golang:1.22-alpine"
 	maxCodeSize       = 1024 * 1024 // 1MB
 	maxOutputSize     = 1024 * 1024 // 1MB
-	requestsPerHour   = 100
-	requestsPerMinute = 5
+	requestsPerHour   = 1000
+	requestsPerMinute = 500
 )
 
 // RateLimiter manages rate limiting per IP address
