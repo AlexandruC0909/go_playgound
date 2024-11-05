@@ -315,14 +315,6 @@ func runCode(code string) (string, error) {
 		return "", fmt.Errorf("failed to attach to exec: %v", err)
 	}
 	defer response.Close()
-	out, err := cli.ContainerLogs(ctx, containerID.ID, container.LogsOptions{ShowStdout: true, ShowStderr: true})
-	if err != nil {
-		return "", fmt.Errorf("failed to get container logs: %v", err)
-	}
-	defer out.Close()
-	if _, err := stdcopy.StdCopy(&stdout, &stderr, out); err != nil {
-		return "", fmt.Errorf("failed to read container output: %v", err)
-	}
 
 	// Read the output
 	var stdout, stderr bytes.Buffer
