@@ -1,113 +1,271 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <title>go_playground</title>
-    <style type="text/css" media="screen">
-        body,
-        html {
-            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-            font-size: 14px;
-            line-height: 1.42857143;
-            background-color: #2D2D2D;
-            color: #333;
-            overflow: hidden;
-            height: 100dvh;
-            width: 100dvw;
-            margin: 0;
-            padding: 0;
-        }
-       .header {
-          display: flex;
-          flex-direction: column; 
-          align-items: center;
-          justify-content: center;
-          background-color: #2D2D2D;
-          color: #C9C9C9;
-       }
-       .header h2{
-        height: 100px;
-        margin: 0;
-       }
-       .container{
-        border-top: 1px solid #C9C9C9;
-       }
-        #editor { 
-            width: 50%;
-            right: 0;
-            bottom: 0;
-            left: 0;
-        }
-        #output {
-          padding: 10px;
-          width: 50%;
-          height: 100%;
-          background-color: #2D2D2D;
-          color: #C9C9C9;
-          border-left: 1px solid #C9C9C9;
-         }
-       
-    </style>
-</head>
-<body>
 
-<div class="header">
-  <h2>Go Playground</h2>
-  <button id="runButton" onclick="runCode()">Run</button>
-</div>
-<div class="container" style="display: flex; height: 100%; flex-direction: row; ">
-  <div id="editor">
-package main
+<head>
+  <title>go_playground</title>
+  <style type="text/css" media="screen">
+    body,
+    html {
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.42857143;
+      background-color: #2d2d2d;
+      color: #333;
+      overflow: hidden;
+      height: 100dvh;
+      width: 100dvw;
+      margin: 0;
+      padding: 0;
+    }
+
+
+/* CSS */
+    .button-1 {
+      margin: 5px;
+      background-color: #235191;
+      border-radius: 7px;
+      border-style: none;
+      box-sizing: border-box;
+      color: #FFFFFF;
+      cursor: pointer;
+      display: inline-block;
+      font-size: 14px;
+      font-weight: 500;
+      height: 30px;
+      line-height: 16px;
+      list-style: none;
+      outline: none;
+      padding: 7px 10px;
+      position: relative;
+      text-align: center;
+      text-decoration: none;
+      transition: color 100ms;
+      vertical-align: baseline;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+
+    .button-1:hover,
+    .button-1:focus {
+      background-color: #2e67b8;
+    }
+    .button-container{
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+    }
+    .runButton{
+      margin: 5px;
+    }
+    .header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: #2d2d2d;
+      color: #c9c9c9;
+      height: 100px;
+    }
+
+    .header h2 {
+      margin: 0;
+    }
+
+    .container {
+      border-top: 1px solid #c9c9c9;
+    }
+
+    #editor {
+      width: 50%;
+      right: 0;
+      bottom: 0;
+      left: 0;
+    }
+
+    #output {
+      overflow: scroll;
+      
+      white-space: pre;
+      max-width: 50%;
+      padding: 10px;
+      height: 100%;
+      background-color: #2d2d2d;
+      color: #c9c9c9;
+      border-left: 1px solid #c9c9c9;
+    }
+    .dropdown {
+      position: relative;
+      display: inline-block;
+    }
+
+    .dropdown-content {
+      padding: 5px;
+      display: none;
+      position: absolute;
+      background-color: #2d2d2d;
+      color: #c9c9c9;
+      min-width: 160px;
+      box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+      z-index: 1;
+    }
+    .dropdown-content div{
+      margin: 3px;
+      cursor: pointer;
+    }
+    .dropdown:hover .dropdown-content {display: block;}
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.36.4/ace.js" type="text/javascript"
+    charset="utf-8"></script>
+</head>
+
+<body>
+  <div class="header">
+    <h2>Go Playground</h2>
+    <div class="button-container">
+      <div class="dropdown">
+        <button class=" button-1">Examples</button>
+        <div class="dropdown-content">
+          <div onclick="resetCode(1)">Hello World!</div>
+          <div onclick="resetCode(2)">Fibonacci</div>
+          <div onclick="resetCode(3)">Bubble Sort</div>
+        </div>
+      </div>
+      <button class="button-1" onclick="resetCode(1)">Reset</button>
+      <button class="button-1" onclick="runCode()">Run</button>
+    </div>
+    
+  </div>
+  <div class="container" style="display: flex; height: 100%; flex-direction: row">
+    <div id="editor">package main
 
 import "fmt"
-    
+
 func main() {
   fmt.Println("Hello, World!")
-}</div>
-    <div id="output">
-
+}
     </div>
-</div>
+    <div id="output"></div>
+  </div>
 
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.36.4/ace.js" type="text/javascript" charset="utf-8"></script>
-<script>
+  <script>
     var editor = ace.edit("editor");
     editor.session.setMode("ace/mode/golang");
-    
+
     editor.setTheme("ace/theme/tomorrow_night_eighties");
     editor.setOption("wrap", 80);
     editor.setOption("enableAutoIndent", true);
-    
+
     editor.commands.addCommand({
-        name: 'runCode',
-        bindKey: {win: 'Ctrl-Enter',  mac: 'Command-Enter'},
-        exec: function(editor) {
-           runCode()
-        },
-        readOnly: true
+      name: "runCode",
+      bindKey: { win: "Ctrl-Enter", mac: "Command-Enter" },
+      exec: function (editor) {
+        runCode();
+      },
+      readOnly: true,
     });
 
     function runCode() {
-        var code = editor.getValue();
+      var code = editor.getValue();
 
-        var xhr = new XMLHttpRequest();
-        xhr.open("POST", "/run", true);
-        xhr.setRequestHeader(
-          "Content-Type",
-          "application/x-www-form-urlencoded"
-        );
-        xhr.onreadystatechange = function () {
-          if (xhr.readyState === XMLHttpRequest.DONE) {
-            if (xhr.status === 200) {
-              document.getElementById("output").textContent = xhr.responseText;
-            } else {
-              document.getElementById("output").textContent =
-                "Error: " + xhr.responseText;
-            }
+      var xhr = new XMLHttpRequest();
+      xhr.open("POST", "/run", true);
+      xhr.setRequestHeader(
+        "Content-Type",
+        "application/x-www-form-urlencoded"
+      );
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState === XMLHttpRequest.DONE) {
+          if (xhr.status === 200) {
+            document.getElementById("output").textContent = xhr.responseText;
+          } else {
+            document.getElementById("output").textContent =
+              "Error: " + xhr.responseText;
           }
-        };
-        xhr.send("code=" + encodeURIComponent(code));
+        }
+      };
+      xhr.send("code=" + encodeURIComponent(code));
+    }
+
+    function resetCode(type) {
+      switch (type) {
+        case 1:
+        editor.setValue(`package main
+
+import "fmt"
+
+func main() {
+  fmt.Println("Hello, World!")
+}`);
+        break
+        case 2:
+        editor.setValue(`package main
+
+import "fmt"
+
+func fibonacci(n int) int {
+	if n <= 
+  1 {
+		return n
+	}
+	    a, b := 0, 1
+    for i := 2; i <= n; i++ {
+        a, b = b, a+b
+    }
+    return b
+}
+
+func main() {
+    n := 20
+    for i := 0; i <= n; i++ {
+        fmt.Printf("Fibonacci(%d) = %d\\n", i, fibonacci(i))
+    }
+}`);
+        break
+        case 3:
+        editor.setValue(`package main
+
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
+
+func bubbleSort(arr []int) {
+	n := len(arr)
+	for i := 0; i < n-1; i++ {
+		swapped := false
+		for j := 0; j < n-i-1; j++ {
+			if arr[j] > arr[j+1] {
+				arr[j], arr[j+1] = arr[j+1], arr[j]
+				swapped = true
+			}
+		}
+		if !swapped {
+			break
+		}
+	}
+}
+
+func main() {
+	rand.Seed(time.Now().UnixNano())
+	
+	arr := make([]int, 30)
+	
+	for i := 0; i < 30; i++ {
+		arr[i] = rand.Intn(101) 
+	}
+
+	fmt.Println("Unsorted array:", arr)
+
+	bubbleSort(arr)
+
+	fmt.Println("Sorted array:", arr)
+}`);
       }
-</script>
+     
+    }
+  </script>
 </body>
+
 </html>
