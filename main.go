@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -25,23 +26,19 @@ import (
 
 const (
 	timeoutSeconds    = 100
-	memoryLimit       = 150 * 1024 * 1024 // 50MB
+	memoryLimit       = 150 * 1024 * 1024
 	dockerImage       = "golang:1.22-alpine"
-	maxCodeSize       = 1024 * 1024 // 1MB
-	maxOutputSize     = 1024 * 1024 // 1MB
+	maxCodeSize       = 1024 * 1024
+	maxOutputSize     = 1024 * 1024
 	requestsPerHour   = 1000
 	requestsPerMinute = 500
 	containerName     = "go-playground"
 )
 
-// RateLimiter manages rate limiting per IP address
 type RateLimiter struct {
 	visitors map[string]*rate.Limiter
 	mu       sync.Mutex
 }
-
-var containerID string
-var localClient *client.Client
 
 func NewRateLimiter() *RateLimiter {
 	return &RateLimiter{
@@ -88,84 +85,215 @@ var (
 		`\bgo\s+func\b`,        // Preventing goroutines
 		`\bmake\(\w+,\s*\d+\)`, // Preventing large slice allocation
 	}
+	containerID string
+	localClient *client.Client
 )
 
 func main() {
-	// Create the Docker container when the server starts
-	createContainer()
+	log.Println("Starting Go Playground...")
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		tmpl, err := template.ParseFS(templates.Templates, "form.html")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		err = tmpl.Execute(w, nil)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	})
+	var err error
+	log.Println("Initializing Docker client...")
+	localClient, err = client.NewClientWithOpts(client.FromEnv, client.WithTimeout(time.Second*30))
+	if err != nil {
+		log.Fatalf("Failed to create Docker client: %v", err)
+	}
+	defer localClient.Close()
 
+	// Ensure container is ready before starting server
+	if err := ensureContainer(); err != nil {
+		log.Fatalf("Failed to ensure container: %v", err)
+	}
+
+	// Pre-warm the container
+	if err := prewarmContainer(); err != nil {
+		log.Printf("Warning: Failed to pre-warm container: %v", err)
+	}
+
+	log.Println("Starting HTTP server...")
+	http.HandleFunc("/", handleHome)
 	http.HandleFunc("/run", handleRun)
-	http.HandleFunc("/robots.txt", robotsHandler)
-	http.ListenAndServe(":8080", nil)
+	http.HandleFunc("/health", handleHealth)
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-func createContainer() {
+func ensureContainer() error {
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	log.Println("Checking for existing container...")
+
+	// Check if container exists and is running
+	containers, err := localClient.ContainerList(ctx, container.ListOptions{All: true})
 	if err != nil {
-		panic(fmt.Errorf("failed to create Docker client: %v", err))
+		return fmt.Errorf("failed to list containers: %v", err)
 	}
 
-	// Check if the container already exists
-	_, err = cli.ContainerInspect(ctx, containerName)
-	if err == nil {
-		return // Container already exists, no need to create a new one
+	for _, cont := range containers {
+		for _, name := range cont.Names {
+			if name == "/"+containerName {
+				log.Printf("Found existing container %s with state %s\n", cont.ID[:12], cont.State)
+
+				if cont.State == "running" {
+					containerID = cont.ID
+					return nil
+				}
+
+				log.Printf("Removing stopped container %s\n", cont.ID[:12])
+				err := localClient.ContainerRemove(ctx, cont.ID, container.RemoveOptions{Force: true})
+				if err != nil {
+					return fmt.Errorf("failed to remove stopped container: %v", err)
+				}
+			}
+		}
 	}
 
-	// Create container config
+	log.Println("Creating new container...")
+
 	config := &container.Config{
 		Image:      dockerImage,
-		Cmd:        []string{"sh", "-c", "while true; do sleep 1; done"}, // Keep the container running
+		Cmd:        []string{"sh", "-c", "while true; do sleep 1; done"},
 		WorkingDir: "/code",
 		Env: []string{
 			"GOMEMLIMIT=50MiB",
 			"GOGC=50",
+			"CGO_ENABLED=0",
 		},
 	}
+
 	pidsLimit := int64(100)
 	hostConfig := &container.HostConfig{
 		Resources: container.Resources{
 			Memory:     memoryLimit,
-			MemorySwap: memoryLimit, // Disable swap
-			NanoCPUs:   1000000000,  // 1 CPU
-			PidsLimit:  &pidsLimit,  // Limit number of processes
+			MemorySwap: memoryLimit,
+			NanoCPUs:   1000000000,
+			PidsLimit:  &pidsLimit,
 		},
 		NetworkMode: "none",
-		AutoRemove:  false, // Do not remove the container when it stops
-		SecurityOpt: []string{
-			"no-new-privileges",
-		},
+		AutoRemove:  false,
+		SecurityOpt: []string{"no-new-privileges"},
 	}
 
-	// Create the container
-	resp, err := cli.ContainerCreate(ctx, config, hostConfig, nil, nil, containerName)
-	if err != nil {
-		panic(fmt.Errorf("failed to create container: %v", err))
-	}
+	resp, err := localClient.ContainerCreate(ctx, config, hostConfig, nil, nil, containerName)
+	/* 	if err != nil {
+		if client.IsErrNotFound(err) {
+			log.Println("Image not found locally, pulling...")
+			if _, err := localClient.ImagePull(ctx, dockerImage, types.ImagePullOptions{}); err != nil {
+				return fmt.Errorf("failed to pull image: %v", err)
+			}
+			// Try creating container again after pulling image
+			resp, err = localClient.ContainerCreate(ctx, config, hostConfig, nil, nil, containerName)
+			if err != nil {
+				return fmt.Errorf("failed to create container after pulling image: %v", err)
+			}
+		} else {
+			return fmt.Errorf("failed to create container: %v", err)
+		}
+	} */
 
-	// Start the container
-	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		panic(fmt.Errorf("failed to start container: %v", err))
+	log.Printf("Starting container %s\n", resp.ID[:12])
+	if err := localClient.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		return fmt.Errorf("failed to start container: %v", err)
 	}
 
 	containerID = resp.ID
-	localClient = cli
+	return nil
+}
+
+func prewarmContainer() error {
+	log.Println("Pre-warming container...")
+	// Simple program to compile
+	warmupCode := `package main
+	
+	func main() {
+		println("warm")
+	}
+	`
+	_, err := runCode(warmupCode)
+	if err != nil {
+		return fmt.Errorf("failed to pre-warm container: %v", err)
+	}
+	log.Println("Container pre-warmed successfully")
+	return nil
+}
+
+func runCode(code string) (string, error) {
+	start := time.Now()
+	defer func() {
+		log.Printf("Code execution took: %v\n", time.Since(start))
+	}()
+
+	if !validateGoCode(code) {
+		return "", fmt.Errorf("invalid or potentially unsafe Go code")
+	}
+
+	log.Println("Creating temporary directory...")
+	tempDir, err := os.MkdirTemp("", "goplayground")
+	if err != nil {
+		return "", err
+	}
+	defer os.RemoveAll(tempDir)
+
+	tempFile := filepath.Join(tempDir, "main.go")
+	if err := os.WriteFile(tempFile, []byte(code), 0600); err != nil {
+		return "", err
+	}
+
+	ctx := context.Background()
+	log.Println("Copying code to container...")
+	tar := createTarFromFile(tempFile)
+	if err := localClient.CopyToContainer(ctx, containerID, "/code", tar, types.CopyToContainerOptions{}); err != nil {
+		return "", fmt.Errorf("failed to copy code to container: %v", err)
+	}
+
+	log.Println("Creating exec instance...")
+	execConfig := container.ExecOptions{
+		Cmd:          []string{"go", "run", "/code/main.go"},
+		WorkingDir:   "/code",
+		AttachStdout: true,
+		AttachStderr: true,
+	}
+
+	execResp, err := localClient.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to create exec: %v", err)
+	}
+
+	log.Println("Starting exec instance...")
+	response, err := localClient.ContainerExecAttach(ctx, execResp.ID, types.ExecStartCheck{})
+	if err != nil {
+		return "", fmt.Errorf("failed to attach to exec: %v", err)
+	}
+	defer response.Close()
+
+	var stdout, stderr bytes.Buffer
+	if _, err := stdcopy.StdCopy(&stdout, &stderr, response.Reader); err != nil {
+		return "", fmt.Errorf("failed to read exec output: %v", err)
+	}
+
+	if stderr.Len() > 0 {
+		return "", fmt.Errorf("execution error: %s", stderr.String())
+	}
+
+	return stdout.String(), nil
+}
+
+func handleHome(w http.ResponseWriter, r *http.Request) {
+	tmpl, err := template.ParseFS(templates.Templates, "form.html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = tmpl.Execute(w, nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func handleRun(w http.ResponseWriter, r *http.Request) {
-	// Get IP address for rate limiting
+	start := time.Now()
+	defer func() {
+		log.Printf("Total request handling took: %v\n", time.Since(start))
+	}()
+
 	ip := r.RemoteAddr
 	if forwardedFor := r.Header.Get("X-Forwarded-For"); forwardedFor != "" {
 		ip = strings.Split(forwardedFor, ",")[0]
@@ -179,8 +307,6 @@ func handleRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	code := r.FormValue("code")
-
-	// Check code size
 	if len(code) > maxCodeSize {
 		http.Error(w, fmt.Sprintf("Code size exceeds maximum limit of %d bytes", maxCodeSize), http.StatusBadRequest)
 		return
@@ -192,7 +318,6 @@ func handleRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check output size
 	if len(output) > maxOutputSize {
 		http.Error(w, fmt.Sprintf("Output size exceeds maximum limit of %d bytes", maxOutputSize), http.StatusBadRequest)
 		return
@@ -201,6 +326,15 @@ func handleRun(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, output)
 }
 
+func handleHealth(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+	_, err := localClient.ContainerInspect(ctx, containerID)
+	if err != nil {
+		http.Error(w, "Container not healthy", http.StatusServiceUnavailable)
+		return
+	}
+	fmt.Fprintln(w, "OK")
+}
 func createTarFromFile(filePath string) io.Reader {
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
@@ -263,64 +397,6 @@ func validateGoCode(code string) bool {
 	}
 
 	return true
-}
-
-func runCode(code string) (string, error) {
-	if !validateGoCode(code) {
-		return "", fmt.Errorf("invalid or potentially unsafe Go code")
-	}
-	tempDir, err := os.MkdirTemp("", "goplayground")
-	if err != nil {
-		return "", err
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Write code to file
-	tempFile := filepath.Join(tempDir, "main.go")
-	if err := os.WriteFile(tempFile, []byte(code), 0600); err != nil {
-		return "", err
-	}
-
-	ctx := context.Background()
-	defer localClient.Close()
-	// Copy code into the existing container
-
-	tar := createTarFromFile(tempFile)
-	if err := localClient.CopyToContainer(ctx, containerName, "/code", tar, container.CopyToContainerOptions{}); err != nil {
-		return "", fmt.Errorf("failed to copy code to container: %v", err)
-	}
-
-	// Execute the command in the running container
-	execConfig := container.ExecOptions{
-		Cmd:          []string{"go", "run", "/code/main.go"},
-		WorkingDir:   "/code",
-		AttachStdout: true,
-		AttachStderr: true,
-	}
-
-	execResp, err := localClient.ContainerExecCreate(ctx, containerID, execConfig)
-	if err != nil {
-		return "", fmt.Errorf("failed to create exec: %v", err)
-	}
-
-	// Start the exec instance
-	response, err := localClient.ContainerExecAttach(ctx, execResp.ID, types.ExecStartCheck{})
-	if err != nil {
-		return "", fmt.Errorf("failed to attach to exec: %v", err)
-	}
-	defer response.Close()
-
-	// Read the output
-	var stdout, stderr bytes.Buffer
-	if _, err := stdcopy.StdCopy(&stdout, &stderr, response.Reader); err != nil {
-		return "", fmt.Errorf("failed to read exec output: %v", err)
-	}
-
-	if stderr.Len() > 0 {
-		return "", fmt.Errorf("execution error: %s", stderr.String())
-	}
-
-	return stdout.String(), nil
 }
 
 func robotsHandler(w http.ResponseWriter, r *http.Request) {
