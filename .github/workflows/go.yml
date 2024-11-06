@@ -25,9 +25,9 @@ jobs:
       run: go build -v ./...
 
     - name: Use SSH key for deployment2
-        uses: webfactory/ssh-agent@v0.5.3
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      uses: webfactory/ssh-agent@v0.5.3
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
     - name: Debug Loaded SSH Keys
       run: |
