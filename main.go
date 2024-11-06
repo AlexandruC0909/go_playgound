@@ -17,8 +17,8 @@ import (
 	"time"
 
 	"github.com/AlexandruC0909/playground/templates"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"golang.org/x/time/rate"
@@ -173,10 +173,10 @@ func ensureContainer() error {
 	}
 
 	resp, err := localClient.ContainerCreate(ctx, config, hostConfig, nil, nil, containerName)
-	/* 	if err != nil {
+	if err != nil {
 		if client.IsErrNotFound(err) {
 			log.Println("Image not found locally, pulling...")
-			if _, err := localClient.ImagePull(ctx, dockerImage, types.ImagePullOptions{}); err != nil {
+			if _, err := localClient.ImagePull(ctx, dockerImage, image.PullOptions{}); err != nil {
 				return fmt.Errorf("failed to pull image: %v", err)
 			}
 			// Try creating container again after pulling image
@@ -187,7 +187,7 @@ func ensureContainer() error {
 		} else {
 			return fmt.Errorf("failed to create container: %v", err)
 		}
-	} */
+	}
 
 	log.Printf("Starting container %s\n", resp.ID[:12])
 	if err := localClient.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
@@ -240,7 +240,7 @@ func runCode(code string) (string, error) {
 	ctx := context.Background()
 	log.Println("Copying code to container...")
 	tar := createTarFromFile(tempFile)
-	if err := localClient.CopyToContainer(ctx, containerID, "/code", tar, types.CopyToContainerOptions{}); err != nil {
+	if err := localClient.CopyToContainer(ctx, containerID, "/code", tar, container.CopyToContainerOptions{}); err != nil {
 		return "", fmt.Errorf("failed to copy code to container: %v", err)
 	}
 
@@ -258,7 +258,7 @@ func runCode(code string) (string, error) {
 	}
 
 	log.Println("Starting exec instance...")
-	response, err := localClient.ContainerExecAttach(ctx, execResp.ID, types.ExecStartCheck{})
+	response, err := localClient.ContainerExecAttach(ctx, execResp.ID, container.ExecStartOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to attach to exec: %v", err)
 	}
