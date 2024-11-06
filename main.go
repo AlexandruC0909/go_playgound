@@ -114,7 +114,7 @@ func main() {
 	http.HandleFunc("/", handleHome)
 	http.HandleFunc("/run", handleRun)
 	http.HandleFunc("/health", handleHealth)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8088", nil))
 }
 
 func ensureContainer() error {
