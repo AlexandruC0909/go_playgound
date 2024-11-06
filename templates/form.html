@@ -8,10 +8,9 @@
     html {
       font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
       font-size: 14px;
-      line-height: 1.42857143;
+      line-height: 1.618;
       background-color: #2d2d2d;
       color: #333;
-      overflow: hidden;
       height: 100dvh;
       width: 100dvw;
       margin: 0;
@@ -73,23 +72,25 @@
     }
 
     .container {
+      display: flex; 
+      height: calc(100dvh - 101px);
+      flex-direction: row;
       border-top: 1px solid #c9c9c9;
     }
 
     #editor {
-      width: 50%;
+      height: 100%;
+      min-width: 50%;
       right: 0;
       bottom: 0;
       left: 0;
     }
 
     #output {
+      padding: 8px 12px;
+      width: 50%;
       overflow: scroll;
-      
-      white-space: pre;
-      max-width: 50%;
-      padding: 10px;
-      height: 100%;
+      white-space: pre-wrap;
       background-color: #2d2d2d;
       color: #c9c9c9;
       border-left: 1px solid #c9c9c9;
@@ -112,6 +113,9 @@
     .dropdown-content div{
       margin: 3px;
       cursor: pointer;
+    }
+    .dropdown-content div:hover{
+      color:white;
     }
     .dropdown:hover .dropdown-content {display: block;}
   </style>
@@ -136,7 +140,7 @@
     </div>
     
   </div>
-  <div class="container" style="display: flex; height: 100%; flex-direction: row">
+  <div class="container">
     <div id="editor">package main
 
 import "fmt"
@@ -196,7 +200,7 @@ import "fmt"
 
 func main() {
   fmt.Println("Hello, World!")
-}`);
+}`, -1);
         break
         case 2:
         editor.setValue(`package main
@@ -220,7 +224,7 @@ func main() {
     for i := 0; i <= n; i++ {
         fmt.Printf("Fibonacci(%d) = %d\\n", i, fibonacci(i))
     }
-}`);
+}`, -1);
         break
         case 3:
         editor.setValue(`package main
@@ -261,7 +265,7 @@ func main() {
 	bubbleSort(arr)
 
 	fmt.Println("Sorted array:", arr)
-}`);
+}`, -1);
       }
      
     }

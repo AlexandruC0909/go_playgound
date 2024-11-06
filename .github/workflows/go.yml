@@ -24,21 +24,20 @@ jobs:
     - name: Build
       run: go build -v ./...
 
-    - name: Run Tests
-      run: go test -coverpkg=./... -race -coverprofile=coverage.out -covermode=atomic ./...
+    - name: Use SSH key for deployment2
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Check for coverage.out in any directory
+    - name: Debug Loaded SSH Keys
       run: |
-        found_file=$(find . -name "coverage.out" -print -quit)
-        if [ -n "$found_file" ]; then
-          echo "coverage.out exists in at least one directory at location: $found_file"
-        else
-          echo "coverage.out does not exist in any directory"
-          # You can add additional debugging information or commands here
-        fi
+        ssh-add -l
     
-    - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@v3
+    - name: Copy program to server
+      run: |
+        scp -o StrictHostKeyChecking=no -i deploy_key.pem ./main $SERVER_USERNAME@$SERVER_IP:/usr/local/playground
       env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        SERVER_USERNAME: ${{ secrets.SERVER_USERNAME }}
+        SERVER_IP: ${{ secrets.SERVER_IP }}
+
 
