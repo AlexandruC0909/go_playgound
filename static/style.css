@@ -40,6 +40,7 @@ html {
   background-color: #2e67b8;
 }
 .button-container{
+  margin-right: 20px;
   display: flex;
   align-items: center;
   justify-content: space-around;
@@ -50,6 +51,7 @@ html {
 .header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   background-color: #2d2d2d;
   color: #c9c9c9;
   height: 70px;
@@ -76,6 +78,7 @@ html {
 }
 
 #output {
+  box-sizing: border-box;
   padding: 8px 12px;
   width: 50%;
   overflow: scroll;
@@ -112,8 +115,8 @@ html {
   .container {
     flex-direction: column;
   }
-  .header h2 {
-    margin-left: 4px;
+  .header h2, .button-container {
+    margin-left: 8px;
     margin-right: 8px;
   }
 

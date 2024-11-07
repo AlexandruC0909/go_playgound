@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Go Playground</title>
+    <link rel="icon" type="image/x-icon" href="/static/icons/favicon.ico">
     <meta name="description" content="An online code editor for the Go programming language.">
     <link rel="stylesheet" href="static/style.css">
 
@@ -46,7 +47,6 @@ func main() {
     editor.session.setMode("ace/mode/golang");
 
     editor.setTheme("ace/theme/tomorrow_night_eighties");
-    editor.setOption("wrap", 80);
     editor.setOption("enableAutoIndent", true);
 
     editor.commands.addCommand({
@@ -105,6 +105,7 @@ func main() {
 
 
     function resetCode(type) {
+      document.getElementById("output").textContent = "";
       switch (type) {
         case 1:
         editor.setValue(`package main
@@ -112,7 +113,7 @@ func main() {
 import "fmt"
 
 func main() {
-  fmt.Println("Hello, World!")
+    fmt.Println("Hello, World!")
 }`, -1);
         break
         case 2:
