@@ -187,8 +187,7 @@ func main() {
       name: "saveCode",
       bindKey: { win: "Ctrl-S", mac: "Command-S" },
       exec: function(editor) {
-        // Implement code saving functionality
-        console.log("Save code:", editor.getValue());
+        saveCode();
       },
       readOnly: false
     });
@@ -204,7 +203,25 @@ func main() {
         })
         .then(response => response.text())
         .then(output => {
-          document.getElementById("output").textContent = output;
+          document.getElementById("output").textContent =  output;
+        })
+        .catch(error => {
+          document.getElementById("output").textContent = 'Error: ' + error;
+        });
+    }
+
+    function saveCode() {
+        var code = editor.getValue();
+        fetch('/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body:'code=' + encodeURIComponent(code)
+        })
+        .then(response => response.text())
+        .then(output => {
+          editor.setValue(decodeURIComponent(output), -1);
         })
         .catch(error => {
           document.getElementById("output").textContent = 'Error: ' + error;

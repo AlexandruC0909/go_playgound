@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"go/format"
 	"html/template"
 	"io"
 	"log"
@@ -114,6 +115,7 @@ func main() {
 	http.HandleFunc("/", handleHome)
 	http.HandleFunc("/run", handleRun)
 	http.HandleFunc("/health", handleHealth)
+	http.HandleFunc("/save", handleSave)
 	http.HandleFunc("/robots.txt", robotsHandler)
 	log.Fatal(http.ListenAndServe(":8088", nil))
 }
@@ -325,6 +327,24 @@ func handleRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Fprintln(w, output)
+}
+
+func handleSave(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	code := r.FormValue("code")
+
+	formatted, err := format.Source([]byte(code))
+	if err != nil {
+		http.Error(w, "Error formatting code", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write(formatted)
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
