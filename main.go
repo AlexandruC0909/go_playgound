@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"go/format"
 	"html/template"
@@ -340,16 +341,30 @@ func handleSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	code := r.FormValue("code")
+	var requestData struct {
+		Code string `json:"code"`
+	}
 
-	formatted, err := format.Source([]byte(code))
+	err := json.NewDecoder(r.Body).Decode(&requestData)
+	if err != nil {
+		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
+		return
+	}
+
+	formatted, err := format.Source([]byte(requestData.Code))
 	if err != nil {
 		http.Error(w, "Error formatting code", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/plain")
-	w.Write(formatted)
+	responseData := struct {
+		Code string `json:"code"`
+	}{
+		Code: string(formatted),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(responseData)
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
