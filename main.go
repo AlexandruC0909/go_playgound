@@ -117,6 +117,11 @@ func main() {
 	http.HandleFunc("/health", handleHealth)
 	http.HandleFunc("/save", handleSave)
 	http.HandleFunc("/robots.txt", robotsHandler)
+
+	workDir, _ := os.Getwd()
+	filesDir := http.Dir(filepath.Join(workDir, "/static"))
+	http.Handle("/static/*", http.StripPrefix("/static/", cacheControlWrapper(http.FileServer(filesDir))))
+
 	log.Fatal(http.ListenAndServe(":8088", nil))
 }
 
@@ -424,4 +429,11 @@ func robotsHandler(w http.ResponseWriter, r *http.Request) {
 	robotsTxt := []byte("User-agent: *\nDisallow: /private/")
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write(robotsTxt)
+}
+
+func cacheControlWrapper(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "max-age=2592000") // 30 days
+		h.ServeHTTP(w, r)
+	})
 }
