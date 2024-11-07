@@ -114,6 +114,7 @@ func main() {
 	http.HandleFunc("/", handleHome)
 	http.HandleFunc("/run", handleRun)
 	http.HandleFunc("/health", handleHealth)
+	http.HandleFunc("/robots.txt", robotsHandler)
 	log.Fatal(http.ListenAndServe(":8088", nil))
 }
 

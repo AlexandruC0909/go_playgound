@@ -2,7 +2,11 @@
 <html lang="en">
 
 <head>
-  <title>go_playground</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Playground</title>
+    <meta name="description" content="An online code editor for the Go programming language.">
+  
   <style type="text/css" media="screen">
     body,
     html {
@@ -16,9 +20,6 @@
       margin: 0;
       padding: 0;
     }
-
-
-/* CSS */
     .button-1 {
       margin: 5px;
       background-color: #235191;
@@ -29,7 +30,6 @@
       cursor: pointer;
       display: inline-block;
       font-size: 14px;
-      font-weight: 500;
       height: 30px;
       line-height: 16px;
       list-style: none;
@@ -59,21 +59,20 @@
     }
     .header {
       display: flex;
-      flex-direction: column;
       align-items: center;
-      justify-content: center;
       background-color: #2d2d2d;
       color: #c9c9c9;
-      height: 100px;
+      height: 70px;
     }
 
     .header h2 {
-      margin: 0;
+      margin-left: 20px;
+      margin-right: 40px;
     }
 
     .container {
       display: flex; 
-      height: calc(100dvh - 101px);
+      height: calc(100dvh - 71px);
       flex-direction: row;
       border-top: 1px solid #c9c9c9;
     }
@@ -118,6 +117,22 @@
       color:white;
     }
     .dropdown:hover .dropdown-content {display: block;}
+
+    @media (max-width: 767px) {
+      .container {
+        flex-direction: column;
+      }
+    
+      #editor,
+      #output {
+        width: 100%;
+      }
+    
+      #output {
+        border-left: none;
+        border-top: 1px solid #c9c9c9;
+    }
+  }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.36.4/ace.js" type="text/javascript"
     charset="utf-8"></script>
@@ -129,10 +144,10 @@
     <div class="button-container">
       <div class="dropdown">
         <button class=" button-1">Examples</button>
-        <div class="dropdown-content">
-          <div onclick="resetCode(1)">Hello World!</div>
-          <div onclick="resetCode(2)">Fibonacci</div>
-          <div onclick="resetCode(3)">Bubble Sort</div>
+        <div class="dropdown-content" role="menu">
+          <div role="menuitem" onclick="resetCode(1)">Hello World!</div>
+          <div role="menuitem" onclick="resetCode(2)">Fibonacci</div>
+          <div role="menuitem" onclick="resetCode(3)">Bubble Sort</div>
         </div>
       </div>
       <button class="button-1" onclick="resetCode(1)">Reset</button>
@@ -168,28 +183,33 @@ func main() {
       },
       readOnly: true,
     });
+    editor.commands.addCommand({
+      name: "saveCode",
+      bindKey: { win: "Ctrl-S", mac: "Command-S" },
+      exec: function(editor) {
+        // Implement code saving functionality
+        console.log("Save code:", editor.getValue());
+      },
+      readOnly: false
+    });
 
     function runCode() {
-      var code = editor.getValue();
-
-      var xhr = new XMLHttpRequest();
-      xhr.open("POST", "/run", true);
-      xhr.setRequestHeader(
-        "Content-Type",
-        "application/x-www-form-urlencoded"
-      );
-      xhr.onreadystatechange = function () {
-        if (xhr.readyState === XMLHttpRequest.DONE) {
-          if (xhr.status === 200) {
-            document.getElementById("output").textContent = xhr.responseText;
-          } else {
-            document.getElementById("output").textContent =
-              "Error: " + xhr.responseText;
-          }
-        }
-      };
-      xhr.send("code=" + encodeURIComponent(code));
-    }
+        var code = editor.getValue();
+        fetch('/run', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: 'code=' + encodeURIComponent(code)
+        })
+        .then(response => response.text())
+        .then(output => {
+          document.getElementById("output").textContent = output;
+        })
+        .catch(error => {
+          document.getElementById("output").textContent = 'Error: ' + error;
+        });
+      }
 
     function resetCode(type) {
       switch (type) {
