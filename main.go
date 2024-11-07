@@ -107,11 +107,6 @@ func main() {
 		log.Fatalf("Failed to ensure container: %v", err)
 	}
 
-	// Pre-warm the container
-	if err := prewarmContainer(); err != nil {
-		log.Printf("Warning: Failed to pre-warm container: %v", err)
-	}
-
 	log.Println("Starting HTTP server...")
 	http.HandleFunc("/", handleHome)
 	http.HandleFunc("/run", handleRun)
@@ -207,23 +202,6 @@ func ensureContainer() error {
 	return nil
 }
 
-func prewarmContainer() error {
-	log.Println("Pre-warming container...")
-	// Simple program to compile
-	warmupCode := `package main
-	
-	func main() {
-		println("warm")
-	}
-	`
-	_, err := runCode(warmupCode)
-	if err != nil {
-		return fmt.Errorf("failed to pre-warm container: %v", err)
-	}
-	log.Println("Container pre-warmed successfully")
-	return nil
-}
-
 func runCode(code string) (string, error) {
 	start := time.Now()
 	defer func() {
@@ -315,13 +293,22 @@ func handleRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	code := r.FormValue("code")
-	if len(code) > maxCodeSize {
+	var requestData struct {
+		Code string `json:"code"`
+	}
+
+	err := json.NewDecoder(r.Body).Decode(&requestData)
+	if err != nil {
+		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
+		return
+	}
+
+	if len(requestData.Code) > maxCodeSize {
 		http.Error(w, fmt.Sprintf("Code size exceeds maximum limit of %d bytes", maxCodeSize), http.StatusBadRequest)
 		return
 	}
 
-	output, err := runCode(code)
+	output, err := runCode(requestData.Code)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

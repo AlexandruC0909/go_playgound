@@ -5,7 +5,7 @@ html {
   line-height: 1.618;
   background-color: #2d2d2d;
   color: #333;
-  height: 100dvh;
+  height: 100%;
   width: 100dvw;
   margin: 0;
   padding: 0;
@@ -112,10 +112,20 @@ html {
   .container {
     flex-direction: column;
   }
+  .header h2 {
+    margin-left: 4px;
+    margin-right: 8px;
+  }
 
   #editor,
   #output {
     width: 100%;
+  }
+  #output {
+    height: 35%;
+  }
+  #editor{
+    height: 65%;
   }
 
   #output {

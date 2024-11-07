@@ -71,9 +71,9 @@ func main() {
         fetch('/run', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
+            'Content-Type': 'application/json'
           },
-          body: 'code=' + encodeURIComponent(code)
+          body: JSON.stringify({ code: code })
         })
         .then(response => response.text())
         .then(output => {
