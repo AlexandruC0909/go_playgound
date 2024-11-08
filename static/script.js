@@ -72,71 +72,73 @@ function resetCode(type) {
 import "fmt"
 
 func main() {
-fmt.Println("Hello, World!")
+    fmt.Println("Hello, World!")
 }`, -1);
     break
     case 2:
-    editor.setValue(`package main
+    editor.setValue(
+`package main
 
 import "fmt"
 
 func fibonacci(n int) int {
-if n <= 1 {
-return n
-}
-  a, b := 0, 1
-for i := 2; i <= n; i++ {
-    a, b = b, a+b
-}
-return b
+	if n <= 1 {
+		return n
+	}
+	a, b := 0, 1
+	for i := 2; i <= n; i++ {
+		a, b = b, a+b
+	}
+	return b
 }
 
 func main() {
-n := 20
-for i := 0; i <= n; i++ {
-    fmt.Printf("Fibonacci(%d) = %d\\n", i, fibonacci(i))
-}
-}`, -1);
+	n := 20
+	for i := 0; i <= n; i++ {
+		fmt.Printf("Fibonacci(%d) = %d\\n", i, fibonacci(i))
+	}
+}`
+, -1);
     break
     case 3:
     editor.setValue(`package main
 
 import (
-"fmt"
-"math/rand"
-"time"
+	"fmt"
+	"math/rand"
+	"time"
 )
 
 func bubbleSort(arr []int) {
-n := len(arr)
-for i := 0; i < n-1; i++ {
-swapped := false
-for j := 0; j < n-i-1; j++ {
-  if arr[j] > arr[j+1] {
-    arr[j], arr[j+1] = arr[j+1], arr[j]
-    swapped = true
-  }
-}
-if !swapped {
-  break
-}
-}
+	n := len(arr)
+	for i := 0; i < n-1; i++ {
+		swapped := false
+		for j := 0; j < n-i-1; j++ {
+			if arr[j] > arr[j+1] {
+				arr[j], arr[j+1] = arr[j+1], arr[j]
+				swapped = true
+			}
+		}
+		if !swapped {
+			break
+		}
+	}
 }
 
 func main() {
-rand.Seed(time.Now().UnixNano())
+	rand.Seed(time.Now().UnixNano())
 
-arr := make([]int, 30)
+	arr := make([]int, 30)
 
-for i := 0; i < 30; i++ {
-arr[i] = rand.Intn(101) 
-}
+	for i := 0; i < 30; i++ {
+		arr[i] = rand.Intn(101)
+	}
 
-fmt.Println("Unsorted array:", arr)
+	fmt.Println("Unsorted array:", arr)
 
-bubbleSort(arr)
+	bubbleSort(arr)
 
-fmt.Println("Sorted array:", arr)
+	fmt.Println("Sorted array:", arr)
 }`, -1);
   }
  
