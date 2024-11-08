@@ -116,6 +116,11 @@ div#output.error::before {
   background-size: contain;
   opacity: 0.2; 
 }
+div#output.success::before {
+  background: url("/static/gophers/gopherSuccess.svg") no-repeat center center;
+  background-size: contain;
+  opacity: 0.2; 
+}
 .dropdown {
   position: relative;
   display: inline-block;

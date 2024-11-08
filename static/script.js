@@ -34,7 +34,6 @@ function runCode() {
   })
   .then(response => {
       if (!response.ok) {
-          // Attempt to parse the error message from the response body
           return response.text().then(errorText => {
               throw new Error('Server error: ' + response.statusText + '\n' + errorText);
           });
@@ -43,10 +42,12 @@ function runCode() {
   })
   .then(output => {
       outputDiv.classList.remove('error');
+      outputDiv.classList.add('success');
       outputDiv.textContent = output;
   })
   .catch(error => {
       outputDiv.textContent = 'Error: ' + error.message;
+      outputDiv.classList.remove('success');
       outputDiv.classList.add('error');
   });
 }
@@ -65,19 +66,26 @@ function saveCode() {
   })
   .then(response => response.json())
   .then(output => {
+      document.getElementById("output").classList.remove('error');
       editor.setValue(output.code, -1);
       editor.moveCursorToPosition(cursorPosition); 
       editor.clearSelection(); 
   })
   .catch(error => {
-      console.error('Fetch error:', error);
-      document.getElementById("output").textContent = 'Error: ' + error;
+    let output = document.getElementById("output")
+    output.classList.remove('success');
+    output.classList.add('error');
+    console.error('Fetch error:', error);
+    output.textContent = 'Error: ' + error;
   });
 }
 
 
 function resetCode(type) {
-  document.getElementById("output").textContent = "";
+  let output = document.getElementById("output")
+  output.classList.remove('error');
+  output.classList.remove('success');
+  output.textContent = "";
   switch (type) {
     case 1:
     editor.setValue(`package main
