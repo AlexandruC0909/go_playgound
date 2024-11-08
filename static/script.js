@@ -22,22 +22,35 @@ editor.commands.addCommand({
 });
 
 function runCode() {
-    var code = editor.getValue();
-    fetch('/run', {
+  const outputDiv = document.getElementById('output');
+  var code = editor.getValue();
+
+  fetch('/run', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+          'Content-Type': 'application/json'
       },
       body: JSON.stringify({ code: code })
-    })
-    .then(response => response.text())
-    .then(output => {
-      document.getElementById("output").textContent =  output;
-    })
-    .catch(error => {
-      document.getElementById("output").textContent = 'Error: ' + error;
-    });
+  })
+  .then(response => {
+      if (!response.ok) {
+          // Attempt to parse the error message from the response body
+          return response.text().then(errorText => {
+              throw new Error('Server error: ' + response.statusText + '\n' + errorText);
+          });
+      }
+      return response.text();
+  })
+  .then(output => {
+      outputDiv.classList.remove('error');
+      outputDiv.textContent = output;
+  })
+  .catch(error => {
+      outputDiv.textContent = 'Error: ' + error.message;
+      outputDiv.classList.add('error');
+  });
 }
+
 
 function saveCode() {
   var code = editor.getValue();
