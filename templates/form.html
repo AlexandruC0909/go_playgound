@@ -9,8 +9,6 @@
     <meta name="description" content="An online code editor for the Go programming language.">
     <link rel="stylesheet" href="static/style.css">
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.36.4/ace.js" type="text/javascript"
-    charset="utf-8"></script>
 </head>
 
 <body>
@@ -18,15 +16,15 @@
     <h2>Go Playground</h2>
     <div class="button-container">
       <div class="dropdown">
-        <button class=" button-1">Examples</button>
+        <button class="button-example button-1">Examples</button>
         <div class="dropdown-content" role="menu">
           <div role="menuitem" onclick="resetCode(1)">Hello World!</div>
           <div role="menuitem" onclick="resetCode(2)">Fibonacci</div>
           <div role="menuitem" onclick="resetCode(3)">Bubble Sort</div>
         </div>
       </div>
-      <button class="button-1" onclick="resetCode(1)">Reset</button>
-      <button class="button-1" onclick="runCode()">Run</button>
+      <button class="button-1 button-reset" onclick="resetCode(1)">Reset</button>
+      <button class="button-1 button-run" onclick="runCode()">Run</button>
     </div>
     
   </div>
@@ -41,148 +39,11 @@ func main() {
     </div>
     <div id="output"></div>
   </div>
-
-  <script>
-    var editor = ace.edit("editor");
-    editor.session.setMode("ace/mode/golang");
-
-    editor.setTheme("ace/theme/tomorrow_night_eighties");
-    editor.setOption("enableAutoIndent", true);
-
-    editor.commands.addCommand({
-      name: "runCode",
-      bindKey: { win: "Ctrl-Enter", mac: "Command-Enter" },
-      exec: function (editor) {
-        runCode();
-      },
-      readOnly: true,
-    });
-    editor.commands.addCommand({
-      name: "saveCode",
-      bindKey: { win: "Ctrl-S", mac: "Command-S" },
-      exec: function(editor) {
-        saveCode();
-      },
-      readOnly: false
-    });
-
-    function runCode() {
-        var code = editor.getValue();
-        fetch('/run', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ code: code })
-        })
-        .then(response => response.text())
-        .then(output => {
-          document.getElementById("output").textContent =  output;
-        })
-        .catch(error => {
-          document.getElementById("output").textContent = 'Error: ' + error;
-        });
-    }
-
-    function saveCode() {
-    var code = editor.getValue();
-    fetch('/save', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ code: code })
-    })
-    .then(response => response.json())
-    .then(output => {
-        editor.setValue(output.code, -1);
-    })
-    .catch(error => {
-        console.error('Fetch error:', error);
-        document.getElementById("output").textContent = 'Error: ' + error;
-    });
-}
-
-
-    function resetCode(type) {
-      document.getElementById("output").textContent = "";
-      switch (type) {
-        case 1:
-        editor.setValue(`package main
-
-import "fmt"
-
-func main() {
-    fmt.Println("Hello, World!")
-}`, -1);
-        break
-        case 2:
-        editor.setValue(`package main
-
-import "fmt"
-
-func fibonacci(n int) int {
-	if n <= 1 {
-		return n
-	}
-	    a, b := 0, 1
-    for i := 2; i <= n; i++ {
-        a, b = b, a+b
-    }
-    return b
-}
-
-func main() {
-    n := 20
-    for i := 0; i <= n; i++ {
-        fmt.Printf("Fibonacci(%d) = %d\\n", i, fibonacci(i))
-    }
-}`, -1);
-        break
-        case 3:
-        editor.setValue(`package main
-
-import (
-	"fmt"
-	"math/rand"
-	"time"
-)
-
-func bubbleSort(arr []int) {
-	n := len(arr)
-	for i := 0; i < n-1; i++ {
-		swapped := false
-		for j := 0; j < n-i-1; j++ {
-			if arr[j] > arr[j+1] {
-				arr[j], arr[j+1] = arr[j+1], arr[j]
-				swapped = true
-			}
-		}
-		if !swapped {
-			break
-		}
-	}
-}
-
-func main() {
-	rand.Seed(time.Now().UnixNano())
-	
-	arr := make([]int, 30)
-	
-	for i := 0; i < 30; i++ {
-		arr[i] = rand.Intn(101) 
-	}
-
-	fmt.Println("Unsorted array:", arr)
-
-	bubbleSort(arr)
-
-	fmt.Println("Sorted array:", arr)
-}`, -1);
-      }
-     
-    }
-  </script>
 </body>
+
+<script src="/static/js/ace.js"></script>
+<script src="/static/js/theme-cobalt.js"></script>
+<script src="/static/js/mode-golang.js"></script>
+<script src="/static/script.js"></script>
 
 </html>

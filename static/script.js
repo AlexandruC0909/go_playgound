@@ -1,19 +1,9 @@
-// Function to load the Ace editor script dynamically
-function loadAceEditor(callback) {
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/ace/1.36.4/ace.js';
-    script.type = 'text/javascript';
-    script.onload = callback;
-    document.head.appendChild(script);
-}
-
 var editor = ace.edit("editor");
 editor.session.setMode("ace/mode/golang");
 
-editor.setTheme("ace/theme/tomorrow_night_eighties");
-editor.setOption("wrap", 80);
+editor.setTheme("ace/theme/cobalt");
 editor.setOption("enableAutoIndent", true);
-
+editor.setShowPrintMargin(false);
 editor.commands.addCommand({
   name: "runCode",
   bindKey: { win: "Ctrl-Enter", mac: "Command-Enter" },
@@ -36,9 +26,9 @@ function runCode() {
     fetch('/run', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type': 'application/json'
       },
-      body: 'code=' + encodeURIComponent(code)
+      body: JSON.stringify({ code: code })
     })
     .then(response => response.text())
     .then(output => {
@@ -50,24 +40,31 @@ function runCode() {
 }
 
 function saveCode() {
-    var code = editor.getValue();
-    fetch('/save', {
+  var code = editor.getValue();
+  var cursorPosition = editor.getCursorPosition();
+
+  fetch('/save', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/json'
       },
-      body:'code=' + encodeURIComponent(code)
-    })
-    .then(response => response.text())
-    .then(output => {
-      editor.setValue(decodeURIComponent(output), -1);
-    })
-    .catch(error => {
+      body: JSON.stringify({ code: code })
+  })
+  .then(response => response.json())
+  .then(output => {
+      editor.setValue(output.code, -1);
+      editor.moveCursorToPosition(cursorPosition); 
+      editor.clearSelection(); 
+  })
+  .catch(error => {
+      console.error('Fetch error:', error);
       document.getElementById("output").textContent = 'Error: ' + error;
-    });
-  }
+  });
+}
+
 
 function resetCode(type) {
+  document.getElementById("output").textContent = "";
   switch (type) {
     case 1:
     editor.setValue(`package main
@@ -84,11 +81,10 @@ fmt.Println("Hello, World!")
 import "fmt"
 
 func fibonacci(n int) int {
-if n <= 
-1 {
-    return n
+if n <= 1 {
+return n
 }
-    a, b := 0, 1
+  a, b := 0, 1
 for i := 2; i <= n; i++ {
     a, b = b, a+b
 }
@@ -114,16 +110,16 @@ import (
 func bubbleSort(arr []int) {
 n := len(arr)
 for i := 0; i < n-1; i++ {
-    swapped := false
-    for j := 0; j < n-i-1; j++ {
-        if arr[j] > arr[j+1] {
-            arr[j], arr[j+1] = arr[j+1], arr[j]
-            swapped = true
-        }
-    }
-    if !swapped {
-        break
-    }
+swapped := false
+for j := 0; j < n-i-1; j++ {
+  if arr[j] > arr[j+1] {
+    arr[j], arr[j+1] = arr[j+1], arr[j]
+    swapped = true
+  }
+}
+if !swapped {
+  break
+}
 }
 }
 
@@ -133,7 +129,7 @@ rand.Seed(time.Now().UnixNano())
 arr := make([]int, 30)
 
 for i := 0; i < 30; i++ {
-    arr[i] = rand.Intn(101) 
+arr[i] = rand.Intn(101) 
 }
 
 fmt.Println("Unsorted array:", arr)
