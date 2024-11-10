@@ -84,7 +84,7 @@ var (
 		`\bnet\.\w+\b`,
 		`\bdebug\.\w+\b`,
 		`\bplugin\.\w+\b`,
-		`\bgo\s+func\b`,        // Preventing goroutines
+		//`\bgo\s+func\b`,        // Preventing goroutines
 		`\bmake\(\w+,\s*\d+\)`, // Preventing large slice allocation
 	}
 	containerID string
@@ -420,9 +420,9 @@ func validateGoCode(code string) bool {
 		return false // Limit number of loops
 	}
 
-	if strings.Count(code, "go ") > 0 {
+	/* 	if strings.Count(code, "go ") > 0 {
 		return false // Prevent goroutines
-	}
+	} */
 
 	return true
 }

@@ -67,9 +67,23 @@ function saveCode() {
   .then(response => response.json())
   .then(output => {
       document.getElementById("output").classList.remove('error');
-      editor.setValue(output.code, -1);
-      editor.moveCursorToPosition(cursorPosition); 
-      editor.clearSelection(); 
+      var formattedCode = output.code;
+      editor.setValue(formattedCode, -1);
+
+      var originalLines = code.split('\n');
+      var formattedLines = formattedCode.split('\n');
+      var originalLine = originalLines[cursorPosition.row];
+      var formattedLine = formattedLines[cursorPosition.row];
+
+      if (formattedLine) {
+          var originalColumn = cursorPosition.column;
+          var formattedColumn = findCorrespondingColumn(originalLine, formattedLine, originalColumn);
+          editor.moveCursorToPosition({ row: cursorPosition.row, column: formattedColumn });
+      } else {
+          editor.moveCursorToPosition({ row: formattedLines.length - 1, column: formattedLines[formattedLines.length - 1].length });
+      }
+
+      editor.clearSelection();
   })
   .catch(error => {
     let output = document.getElementById("output")
@@ -79,6 +93,18 @@ function saveCode() {
     output.textContent = 'Error: ' + error;
   });
 }
+
+function findCorrespondingColumn(originalLine, formattedLine, originalColumn) {
+  var originalChar = originalLine[originalColumn];
+  var formattedColumn = formattedLine.indexOf(originalChar);
+
+  if (formattedColumn === -1) {
+      return originalColumn;
+  }
+
+  return formattedColumn;
+}
+
 
 
 function resetCode(type) {
@@ -161,8 +187,56 @@ func main() {
 
 	fmt.Println("Sorted array:", arr)
 }`, -1);
+    break
+    case 4:
+    editor.setValue(`package main
+
+import (
+	"fmt"
+	"sync"
+	"time"
+)
+
+func calculate(n int, calcFunc func(int) int, ch chan int, wg *sync.WaitGroup) {
+	defer wg.Done()
+	time.Sleep(time.Second)
+	ch <- calcFunc(n)
+}
+
+func main() {
+	var wg sync.WaitGroup
+	squareChan := make(chan int)
+	cubeChan := make(chan int)
+
+	number := 3
+
+	wg.Add(2)
+	go calculate(number, func(n int) int { return n * n }, squareChan, &wg)
+	go calculate(number, func(n int) int { return n * n * n }, cubeChan, &wg)
+
+	go func() {
+		wg.Wait()
+		close(squareChan)
+		close(cubeChan)
+	}()
+
+	squareResult, ok := <-squareChan
+	if !ok {
+		fmt.Println("Failed to receive square result")
+	} else {
+		fmt.Printf("Square: %d\\n", squareResult)
+	}
+
+	cubeResult, ok := <-cubeChan
+	if !ok {
+		fmt.Println("Failed to receive cube result")
+	} else {
+		fmt.Printf("Cube: %d\\n", cubeResult)
+	}
+}
+`, -1);
   }
- 
+
 }
 
 function selectMenuItem(option) {
