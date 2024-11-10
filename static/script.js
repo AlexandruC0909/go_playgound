@@ -1,4 +1,12 @@
+document.addEventListener("DOMContentLoaded", function() {
+  var textarea = document.querySelector(".ace_text-input");
+  if (textarea) {
+      textarea.setAttribute("aria-labelledby", "editor-label");
+  }
+});
+
 var editor = ace.edit("editor");
+var currentExample = 1;
 editor.session.setMode("ace/mode/golang");
 
 editor.setTheme("ace/theme/cobalt");
@@ -107,12 +115,13 @@ function findCorrespondingColumn(originalLine, formattedLine, originalColumn) {
 
 
 
-function resetCode(type) {
+function resetCode() {
+  currentExample
   let output = document.getElementById("output")
   output.classList.remove('error');
   output.classList.remove('success');
   output.textContent = "";
-  switch (type) {
+  switch (currentExample) {
     case 1:
     editor.setValue(`package main
 
@@ -286,10 +295,18 @@ func main() {
 }
 
 function selectMenuItem(option) {
-  resetCode(option);
+  if (!!option) {
+    currentExample = option;
+  }
+  resetCode();
   document.querySelector('.dropdown-content').style.display = 'none';
 }
 
 document.querySelector('.dropdown').addEventListener('mouseenter', function() {
   document.querySelector('.dropdown-content').style.display = 'block';
 });
+document.querySelector('.dropdown').addEventListener('mouseleave', function() {
+  document.querySelector('.dropdown-content').style.display = 'none';
+});
+
+

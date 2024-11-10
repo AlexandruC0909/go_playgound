@@ -25,13 +25,16 @@
           <div role="menuitem" onclick="selectMenuItem(5)">Matrix multiplication</div>
         </div>
       </div>
-      <button class="button-1 button-reset" onclick="selectMenuItem(1)">Reset</button>
+      <button class="button-1 button-reset" onclick="selectMenuItem()">Reset</button>
       <button class="button-1 button-run" onclick="runCode()">Run</button>
     </div>
     
   </div>
+  
   <div class="container">
-    <div id="editor">package main
+    
+    <label id="editor-label" style="display: none">Code Editor:</label>
+    <div id="editor" aria-label="Code Editor" tabindex="0">package main
 
 import "fmt"
 
