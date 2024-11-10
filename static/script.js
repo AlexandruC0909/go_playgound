@@ -235,6 +235,52 @@ func main() {
 	}
 }
 `, -1);
+    break
+    case 5:
+    editor.setValue(`package main
+
+import (
+	"fmt"
+)
+
+func multiplyMatrices(a, b [][]int) [][]int {
+	rowsA, colsA := len(a), len(a[0])
+	_, colsB := len(b), len(b[0])
+
+	result := make([][]int, rowsA)
+	for i := range result {
+		result[i] = make([]int, colsB)
+	}
+
+	for i := 0; i < rowsA; i++ {
+		for j := 0; j < colsB; j++ {
+			for k := 0; k < colsA; k++ {
+				result[i][j] += a[i][k] * b[k][j]
+			}
+		}
+	}
+
+	return result
+}
+
+func main() {
+	a := [][]int{
+		{1, 2},
+		{3, 4},
+	}
+	b := [][]int{
+		{5, 6},
+		{7, 8},
+	}
+
+	result := multiplyMatrices(a, b)
+	fmt.Println("Result of matrix multiplication:")
+	for _, row := range result {
+		fmt.Println(row)
+	}
+}
+
+`, -1);
   }
 
 }
