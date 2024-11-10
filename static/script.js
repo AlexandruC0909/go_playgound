@@ -164,3 +164,12 @@ func main() {
   }
  
 }
+
+function selectMenuItem(option) {
+  resetCode(option);
+  document.querySelector('.dropdown-content').style.display = 'none';
+}
+
+document.querySelector('.dropdown').addEventListener('mouseenter', function() {
+  document.querySelector('.dropdown-content').style.display = 'block';
+});
