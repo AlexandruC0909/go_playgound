@@ -89,7 +89,6 @@ html {
 }
 
 #output {
-  position: relative;
   box-sizing: border-box;
   padding: 8px 12px;
   width: 50%;
@@ -148,6 +147,7 @@ div#output.success::before {
 
 @media (max-width: 767px) {
   div#output::before {
+    position: absolute;
     width: 13vh;
     height: 13vh;
   }
