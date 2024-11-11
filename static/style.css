@@ -120,6 +120,11 @@ div#output.success::before {
   background-size: contain;
   opacity: 0.2; 
 }
+div#output.invalid::before {
+  background: url("/static/gophers/gopherInvalidCode.svg") no-repeat center center;
+  background-size: contain;
+  opacity: 0.2; 
+}
 .dropdown {
   position: relative;
   display: inline-block;

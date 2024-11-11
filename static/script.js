@@ -50,13 +50,22 @@ function runCode() {
   })
   .then(output => {
       outputDiv.classList.remove('error');
+      outputDiv.classList.remove('invalid');
       outputDiv.classList.add('success');
       outputDiv.textContent = output;
   })
   .catch(error => {
       outputDiv.textContent = 'Error: ' + error.message;
       outputDiv.classList.remove('success');
-      outputDiv.classList.add('error');
+      var error = error.message;
+      if (error.includes(
+        "invalid or potentially unsafe Go code"
+      )
+      ) {
+        outputDiv.classList.add('invalid');
+      } else {
+        outputDiv.classList.add('error');
+      }
   });
 }
 
@@ -64,7 +73,7 @@ function runCode() {
 function saveCode() {
   var code = editor.getValue();
   var cursorPosition = editor.getCursorPosition();
-
+  
   fetch('/save', {
       method: 'POST',
       headers: {
@@ -76,41 +85,87 @@ function saveCode() {
   .then(output => {
       document.getElementById("output").classList.remove('error');
       var formattedCode = output.code;
+      
+      var hasSelection = !editor.selection.isEmpty();
+      var selectionRange = hasSelection ? editor.selection.getRange() : null;
+      
       editor.setValue(formattedCode, -1);
-
+      
       var originalLines = code.split('\n');
       var formattedLines = formattedCode.split('\n');
-      var originalLine = originalLines[cursorPosition.row];
-      var formattedLine = formattedLines[cursorPosition.row];
-
-      if (formattedLine) {
-          var originalColumn = cursorPosition.column;
-          var formattedColumn = findCorrespondingColumn(originalLine, formattedLine, originalColumn);
-          editor.moveCursorToPosition({ row: cursorPosition.row, column: formattedColumn });
+      
+      if (cursorPosition.row < formattedLines.length) {
+          var originalLine = originalLines[cursorPosition.row];
+          var formattedLine = formattedLines[cursorPosition.row];
+          var formattedColumn = findCorrespondingColumn(originalLine, formattedLine, cursorPosition.column);
+          
+          editor.moveCursorToPosition({
+              row: cursorPosition.row,
+              column: formattedColumn
+          });
       } else {
-          editor.moveCursorToPosition({ row: formattedLines.length - 1, column: formattedLines[formattedLines.length - 1].length });
+          editor.moveCursorToPosition({
+              row: formattedLines.length - 1,
+              column: formattedLines[formattedLines.length - 1].length
+          });
       }
-
-      editor.clearSelection();
+      
+      if (hasSelection && selectionRange) {
+          editor.selection.setRange(selectionRange);
+      } else {
+          editor.clearSelection();
+      }
   })
   .catch(error => {
-    let output = document.getElementById("output")
-    output.classList.remove('success');
-    output.classList.add('error');
-    console.error('Fetch error:', error);
-    output.textContent = 'Error: ' + error;
+      let output = document.getElementById("output");
+      output.classList.remove('success');
+      output.classList.add('error');
+      console.error('Fetch error:', error);
+      output.textContent = 'Error: ' + error;
   });
 }
 
 function findCorrespondingColumn(originalLine, formattedLine, originalColumn) {
-  var originalChar = originalLine[originalColumn];
-  var formattedColumn = formattedLine.indexOf(originalChar);
-
-  if (formattedColumn === -1) {
-      return originalColumn;
+  if (!originalLine || !formattedLine) return 0;
+  
+  const originalPositions = new Map();
+  const formattedPositions = new Map();
+  
+  for (let i = 0; i < originalLine.length; i++) {
+      const char = originalLine[i];
+      if (!originalPositions.has(char)) {
+          originalPositions.set(char, []);
+      }
+      originalPositions.get(char).push(i);
   }
-
-  return formattedColumn;
+  
+  for (let i = 0; i < formattedLine.length; i++) {
+      const char = formattedLine[i];
+      if (!formattedPositions.has(char)) {
+          formattedPositions.set(char, []);
+      }
+      formattedPositions.get(char).push(i);
+  }
+  
+  const targetChar = originalLine[originalColumn];
+  if (!targetChar) return formattedLine.length;
+  
+  const originalPositionsArray = originalPositions.get(targetChar) || [];
+  let occurrenceIndex = 0;
+  for (let i = 0; i < originalPositionsArray.length; i++) {
+      if (originalPositionsArray[i] <= originalColumn) {
+          occurrenceIndex = i;
+      } else {
+          break;
+      }
+  }
+  
+  const formattedPositionsArray = formattedPositions.get(targetChar) || [];
+  if (formattedPositionsArray.length > occurrenceIndex) {
+      return formattedPositionsArray[occurrenceIndex];
+  }
+  
+  return formattedLine.length;
 }
 
 
@@ -120,6 +175,7 @@ function resetCode() {
   let output = document.getElementById("output")
   output.classList.remove('error');
   output.classList.remove('success');
+  output.classList.remove('invalid');
   output.textContent = "";
   switch (currentExample) {
     case 1:

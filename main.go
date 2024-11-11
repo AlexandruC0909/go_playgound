@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/format"
 	"html/template"
@@ -207,9 +208,9 @@ func runCode(code string) (string, error) {
 	defer func() {
 		log.Printf("Code execution took: %v\n", time.Since(start))
 	}()
-
+	var ErrInvalidGoCode = errors.New("invalid or potentially unsafe Go code")
 	if !validateGoCode(code) {
-		return "", fmt.Errorf("invalid or potentially unsafe Go code")
+		return "", fmt.Errorf(`%w`, ErrInvalidGoCode)
 	}
 
 	log.Println("Creating temporary directory...")
@@ -368,20 +369,17 @@ func createTarFromFile(filePath string) io.Reader {
 	tw := tar.NewWriter(&buf)
 	defer tw.Close()
 
-	// Read the file
 	file, err := os.Open(filePath)
 	if err != nil {
 		return &buf
 	}
 	defer file.Close()
 
-	// Get file info
 	info, err := file.Stat()
 	if err != nil {
 		return &buf
 	}
 
-	// Create tar header
 	header := &tar.Header{
 		Name:    "main.go",
 		Size:    info.Size(),
@@ -389,12 +387,10 @@ func createTarFromFile(filePath string) io.Reader {
 		ModTime: time.Now(),
 	}
 
-	// Write header
 	if err := tw.WriteHeader(header); err != nil {
 		return &buf
 	}
 
-	// Copy file content to tar
 	if _, err := io.Copy(tw, file); err != nil {
 		return &buf
 	}
@@ -403,7 +399,6 @@ func createTarFromFile(filePath string) io.Reader {
 }
 
 func validateGoCode(code string) bool {
-	// Check for dangerous patterns
 	for _, pattern := range disallowedPatterns {
 		match, _ := regexp.MatchString(pattern, code)
 		if match {
@@ -411,18 +406,17 @@ func validateGoCode(code string) bool {
 		}
 	}
 
-	// Additional code validation
 	if strings.Count(code, "func") > 50 {
 		return false // Prevent too many functions
 	}
 
-	if strings.Count(code, "for") > 10 {
+	if strings.Count(code, "for") > 30 {
 		return false // Limit number of loops
 	}
-
-	/* 	if strings.Count(code, "go ") > 0 {
-		return false // Prevent goroutines
-	} */
+	/*
+		if strings.Count(code, "go ") > 0 {
+			return false // Prevent goroutines
+		} */
 
 	return true
 }
