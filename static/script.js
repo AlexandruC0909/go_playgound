@@ -29,7 +29,14 @@ editor.commands.addCommand({
   readOnly: false,
 });
 
-function runCode() {
+function runCode(){
+  if(currentExample == 6){
+    runCodeWithInput();
+  } else {
+    runStaticCode();
+  }
+}
+function runStaticCode() {
   const outputDiv = document.getElementById("output");
   var code = editor.getValue();
 
@@ -187,7 +194,6 @@ document.querySelector(".dropdown").addEventListener("mouseleave", function () {
 
 async function runCodeWithInput() {
   const outputDiv = document.getElementById("output");
-  const inputContainer = document.getElementById("input-container");
 
   const code = editor.getValue();
   let sessionId;
@@ -240,6 +246,10 @@ async function runCodeWithInput() {
       }
 
       if (data.waitingForInput) {
+        const inputSection = document.getElementById("input-section");
+        inputSection.classList.remove("display-none");
+        inputSection.classList.add("display");
+        
         const inputLine = document.createElement("div");
         inputLine.className = "input-line active";
 
@@ -278,12 +288,16 @@ async function runCodeWithInput() {
           });
           input.setAttribute("data-enter-listener", "true");
         }
-
+       
         input.focus();
       }
 
       if (data.done) {
+        inputSection.classList.remove("display");
+        inputSection.classList.add("display-none");
+
         eventSource.close();
+        outputDiv.innerHTML += `<div class="info">Program finished</div>`;
       }
     };
 

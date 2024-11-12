@@ -28,7 +28,6 @@
       </div>
       <button class="button-1 button-reset" onclick="selectMenuItem()">Reset</button>
       <button class="button-1 button-run" onclick="runCode()">Run</button>
-      <button class="button-1 button-run" onclick="runCodeWithInput()">Run</button>
 
     </div>
     
@@ -47,9 +46,8 @@ func main() {
     </div>
     <div class="righ-side">
       <div id="output"></div>
-      <div class="input-section">
-      <div id="input-container">
-        <input class="input-field" type="text" placeholder="Enter input" id="console-input">
+      <div id="input-section" class="display-none">
+        <textarea class="input-field" type="text" placeholder="Enter input" id="console-input"> </textarea>
       </div>
     </div>
    
