@@ -346,8 +346,34 @@ func main() {
 }
 
 `, -1);
-  }
+    break
+    case 6:
+    editor.setValue(`package main
 
+    import (
+        "bufio"
+        "fmt"
+        "os"
+        "strings"
+    )
+    
+    func main() {
+        scanner := bufio.NewScanner(os.Stdin)
+        
+        fmt.Println("What's your name?")
+        scanner.Scan()
+        name := scanner.Text()
+        
+        fmt.Println("What's your favorite color?")
+        scanner.Scan()
+        color := scanner.Text()
+        
+        fmt.Printf("Nice to meet you, %s! %s is a great color!\n", 
+            strings.TrimSpace(name), 
+            strings.TrimSpace(color))
+    }`, -1);
+    break
+}
 }
 
 function selectMenuItem(option) {

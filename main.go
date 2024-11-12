@@ -440,8 +440,6 @@ func cacheControlWrapper(h http.Handler) http.Handler {
 	})
 }
 
-// Add these new types and handlers to your Go backend
-
 type ProgramOutput struct {
 	Output          string `json:"output,omitempty"`
 	Error           string `json:"error,omitempty"`
