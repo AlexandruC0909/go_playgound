@@ -180,3 +180,64 @@ div#output.invalid::before {
     border-top: 1px solid #c9c9c9;
 }
 }
+
+/* Add these styles to your CSS file */
+
+.input-container {
+  margin-top: 1rem;
+}
+
+.input-line {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  opacity: 0.7;
+}
+
+.input-line.active {
+  opacity: 1;
+}
+
+.input-field {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.input-field:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.send-input {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+.send-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.output-line {
+  margin: 0.25rem 0;
+  font-family: monospace;
+  white-space: pre-wrap;
+}
+
+#output {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 1rem;
+  background: #f5f5f5;
+  border-radius: 4px;
+  margin-top: 1rem;
+}
+
+.error {
+  color: #cc0000;
+  margin: 0.25rem 0;
+  font-family: monospace;
+}

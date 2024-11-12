@@ -27,12 +27,23 @@
       </div>
       <button class="button-1 button-reset" onclick="selectMenuItem()">Reset</button>
       <button class="button-1 button-run" onclick="runCode()">Run</button>
+      <button class="button-1 button-run" onclick="runCodeWithInput()">Run</button>
+
     </div>
     
   </div>
   
   <div class="container">
-    
+    <div class="input-section">
+      <div class="input-header">
+          <h3>Program Input</h3>
+          <div class="input-buttons">
+              <button class="button-1" onclick="addInputLine()">Add Input Line</button>
+              <button class="button-1" onclick="clearInputs()">Clear Inputs</button>
+          </div>
+      </div>
+      <div id="input-container"></div>
+  </div>
     <label id="editor-label" style="display: none">Code Editor:</label>
     <div id="editor" aria-label="Code Editor" tabindex="0">package main
 

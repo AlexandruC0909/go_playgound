@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/tar"
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -15,8 +16,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/AlexandruC0909/playground/templates"
@@ -114,6 +117,9 @@ func main() {
 	http.HandleFunc("/health", handleHealth)
 	http.HandleFunc("/save", handleSave)
 	http.HandleFunc("/robots.txt", robotsHandler)
+	http.HandleFunc("/run-with-input", handleRunWithInput)
+	http.HandleFunc("/program-output", handleProgramOutput)
+	http.HandleFunc("/send-input", handleSendInput)
 
 	workDir, _ := os.Getwd()
 	filesDir := http.Dir(filepath.Join(workDir, "/static"))
@@ -432,4 +438,232 @@ func cacheControlWrapper(h http.Handler) http.Handler {
 		w.Header().Set("Cache-Control", "max-age=2592000") // 30 days
 		h.ServeHTTP(w, r)
 	})
+}
+
+// Add these new types and handlers to your Go backend
+
+type ProgramOutput struct {
+	Output          string `json:"output,omitempty"`
+	Error           string `json:"error,omitempty"`
+	WaitingForInput bool   `json:"waitingForInput"`
+	Done            bool   `json:"done"`
+}
+
+type InputRequest struct {
+	Input string `json:"input"`
+}
+
+type ProgramSession struct {
+	inputChan  chan string
+	outputChan chan ProgramOutput
+	done       chan struct{}
+}
+
+var (
+	// Map to store active sessions
+	activeSessions = sync.Map{}
+	// Generate unique session IDs
+	sessionCounter uint64
+)
+
+func newSession() *ProgramSession {
+	return &ProgramSession{
+		inputChan:  make(chan string),
+		outputChan: make(chan ProgramOutput),
+		done:       make(chan struct{}),
+	}
+}
+
+func handleRunWithInput(w http.ResponseWriter, r *http.Request) {
+	var requestData struct {
+		Code string `json:"code"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
+		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Generate new session ID
+	sessionID := atomic.AddUint64(&sessionCounter, 1)
+	session := newSession()
+
+	// Store session
+	activeSessions.Store(sessionID, session)
+
+	// Start program execution in goroutine
+	go func() {
+		runCodeInteractive(requestData.Code, session)
+		activeSessions.Delete(sessionID)
+		close(session.done)
+	}()
+
+	// Return session ID to client
+	json.NewEncoder(w).Encode(map[string]uint64{"sessionId": sessionID})
+}
+
+func handleProgramOutput(w http.ResponseWriter, r *http.Request) {
+	sessionID, err := strconv.ParseUint(r.URL.Query().Get("sessionId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	sessionInterface, ok := activeSessions.Load(sessionID)
+	if !ok {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	}
+	session := sessionInterface.(*ProgramSession)
+
+	// Set headers for SSE
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	// Create done channel for this connection
+	done := make(chan struct{})
+	defer close(done)
+
+	// Close connection if client disconnects
+	go func() {
+		<-r.Context().Done()
+		close(done)
+	}()
+
+	for {
+		select {
+		case output, ok := <-session.outputChan:
+			if !ok {
+				return
+			}
+			data, _ := json.Marshal(output)
+			fmt.Fprintf(w, "data: %s\n\n", data)
+			flusher.Flush()
+
+			if output.Done || output.Error != "" {
+				return
+			}
+		case <-done:
+			return
+		case <-session.done:
+			return
+		}
+	}
+}
+
+func handleSendInput(w http.ResponseWriter, r *http.Request) {
+	sessionID, err := strconv.ParseUint(r.URL.Query().Get("sessionId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	sessionInterface, ok := activeSessions.Load(sessionID)
+	if !ok {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	}
+	session := sessionInterface.(*ProgramSession)
+
+	var inputReq InputRequest
+	if err := json.NewDecoder(r.Body).Decode(&inputReq); err != nil {
+		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
+		return
+	}
+
+	select {
+	case session.inputChan <- inputReq.Input:
+		w.WriteHeader(http.StatusOK)
+	case <-session.done:
+		http.Error(w, "Program execution completed", http.StatusGone)
+	case <-time.After(5 * time.Second):
+		http.Error(w, "Timeout waiting for program to accept input", http.StatusRequestTimeout)
+	}
+}
+
+func runCodeInteractive(code string, session *ProgramSession) {
+	defer close(session.outputChan)
+
+	if !validateGoCode(code) {
+		session.outputChan <- ProgramOutput{Error: "invalid or potentially unsafe Go code"}
+		return
+	}
+
+	ctx := context.Background()
+	tempDir, err := os.MkdirTemp("", "goplayground")
+	if err != nil {
+		session.outputChan <- ProgramOutput{Error: err.Error()}
+		return
+	}
+	defer os.RemoveAll(tempDir)
+
+	tempFile := filepath.Join(tempDir, "main.go")
+	if err := os.WriteFile(tempFile, []byte(code), 0600); err != nil {
+		session.outputChan <- ProgramOutput{Error: err.Error()}
+		return
+	}
+
+	tar := createTarFromFile(tempFile)
+	if err := localClient.CopyToContainer(ctx, containerID, "/code", tar, container.CopyToContainerOptions{}); err != nil {
+		session.outputChan <- ProgramOutput{Error: fmt.Sprintf("failed to copy code to container: %v", err)}
+		return
+	}
+
+	execConfig := container.ExecOptions{
+		Cmd:          []string{"go", "run", "/code/main.go"},
+		WorkingDir:   "/code",
+		AttachStdin:  true,
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          false,
+	}
+
+	execResp, err := localClient.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		session.outputChan <- ProgramOutput{Error: fmt.Sprintf("failed to create exec: %v", err)}
+		return
+	}
+
+	response, err := localClient.ContainerExecAttach(ctx, execResp.ID, container.ExecStartOptions{})
+	if err != nil {
+		session.outputChan <- ProgramOutput{Error: fmt.Sprintf("failed to attach to exec: %v", err)}
+		return
+	}
+	defer response.Close()
+
+	// Handle program output
+	go func() {
+		scanner := bufio.NewScanner(response.Reader)
+		for scanner.Scan() {
+			select {
+			case <-session.done:
+				return
+			case session.outputChan <- ProgramOutput{
+				Output:          scanner.Text(),
+				WaitingForInput: true,
+			}:
+			}
+		}
+	}()
+
+	// Handle program input
+	for {
+		select {
+		case input, ok := <-session.inputChan:
+			if !ok {
+				return
+			}
+			fmt.Fprintln(response.Conn, input)
+		case <-session.done:
+			return
+		}
+	}
 }

@@ -366,3 +366,158 @@ document.querySelector('.dropdown').addEventListener('mouseleave', function() {
 });
 
 
+// Add this to your script.js file
+
+let inputLines = [];
+
+function addInputLine() {
+    const inputContainer = document.getElementById('input-container');
+    const inputLine = document.createElement('div');
+    inputLine.className = 'input-line';
+    
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'input-field';
+    input.placeholder = 'Enter input line';
+    
+    const removeButton = document.createElement('button');
+    removeButton.textContent = '×';
+    removeButton.className = 'remove-input';
+    removeButton.onclick = () => inputContainer.removeChild(inputLine);
+    
+    inputLine.appendChild(input);
+    inputLine.appendChild(removeButton);
+    inputContainer.appendChild(inputLine);
+}
+
+function clearInputs() {
+    const inputContainer = document.getElementById('input-container');
+    inputContainer.innerHTML = '';
+    inputLines = [];
+}
+// Updated script.js
+// Updated frontend JavaScript
+async function runCodeWithInput() {
+    const outputDiv = document.getElementById('output');
+    const inputContainer = document.getElementById('input-container');
+    outputDiv.innerHTML = '';
+    inputContainer.innerHTML = '';
+    
+    const code = editor.getValue();
+    let sessionId;
+    
+    try {
+        // Start program execution and get session ID
+        const response = await fetch('/run-with-input', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                code: code
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error('Server error: ' + response.statusText + '\n' + errorText);
+        }
+
+        const result = await response.json();
+        sessionId = result.sessionId;
+
+        // Close any existing EventSource
+        if (window.currentEventSource) {
+            window.currentEventSource.close();
+        }
+
+        // Set up SSE for getting program output
+        const eventSource = new EventSource(`/program-output?sessionId=${sessionId}`);
+        window.currentEventSource = eventSource;
+        
+        eventSource.onmessage = async (event) => {
+            const data = JSON.parse(event.data);
+            
+            if (data.error) {
+                outputDiv.innerHTML += `<div class="error">${data.error}</div>`;
+                eventSource.close();
+                return;
+            }
+            
+            if (data.output) {
+                outputDiv.innerHTML += `<div class="output-line">${data.output}</div>`;
+                outputDiv.scrollTop = outputDiv.scrollHeight;
+            }
+            
+            if (data.waitingForInput) {
+                const inputLine = document.createElement('div');
+                inputLine.className = 'input-line active';
+                
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'input-field';
+                input.placeholder = 'Enter input';
+                
+                const sendButton = document.createElement('button');
+                sendButton.textContent = 'Send';
+                sendButton.className = 'send-input button-1';
+                
+                const submitInput = async () => {
+                    const inputValue = input.value;
+                    if (!inputValue) return;
+                    
+                    input.disabled = true;
+                    sendButton.disabled = true;
+                    inputLine.classList.remove('active');
+                    
+                    outputDiv.innerHTML += `<div class="input-line">${inputValue}</div>`;
+                    
+                    try {
+                        const response = await fetch(`/send-input?sessionId=${sessionId}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ input: inputValue })
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(await response.text());
+                        }
+                    } catch (error) {
+                        outputDiv.innerHTML += `<div class="error">Failed to send input: ${error.message}</div>`;
+                        eventSource.close();
+                    }
+                };
+                
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        submitInput();
+                    }
+                });
+                
+                sendButton.onclick = submitInput;
+                
+                inputLine.appendChild(input);
+                inputLine.appendChild(sendButton);
+                inputContainer.appendChild(inputLine);
+                
+                input.focus();
+            }
+            
+            if (data.done) {
+                eventSource.close();
+                inputContainer.innerHTML = '';
+            }
+        };
+        
+        eventSource.onerror = (error) => {
+            console.error('EventSource error:', error);
+            eventSource.close();
+            outputDiv.innerHTML += `<div class="error">Connection error</div>`;
+        };
+        
+    } catch (error) {
+        outputDiv.innerHTML += `<div class="error">Error: ${error.message}</div>`;
+    }
+}
