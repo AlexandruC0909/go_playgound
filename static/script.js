@@ -185,36 +185,6 @@ document.querySelector(".dropdown").addEventListener("mouseleave", function () {
   document.querySelector(".dropdown-content").style.display = "none";
 });
 
-// Add this to your script.js file
-
-let inputLines = [];
-
-function addInputLine() {
-  const inputContainer = document.getElementById("input-container");
-  const inputLine = document.createElement("div");
-  inputLine.className = "input-line";
-
-  const input = document.createElement("input");
-  input.type = "text";
-  input.className = "input-field";
-  input.placeholder = "Enter input line";
-
-  const removeButton = document.createElement("button");
-  removeButton.textContent = "×";
-  removeButton.className = "remove-input";
-  removeButton.onclick = () => inputContainer.removeChild(inputLine);
-
-  inputLine.appendChild(input);
-  inputLine.appendChild(removeButton);
-  inputContainer.appendChild(inputLine);
-}
-
-function clearInputs() {
-  const inputContainer = document.getElementById("input-container");
-  inputContainer.innerHTML = "";
-  inputLines = [];
-}
-
 async function runCodeWithInput() {
   const outputDiv = document.getElementById("output");
   const inputContainer = document.getElementById("input-container");
@@ -265,7 +235,7 @@ async function runCodeWithInput() {
       }
 
       if (data.output) {
-        outputDiv.innerHTML += data.output;
+        outputDiv.innerHTML +=  `<div>${data.output}</div>`;
         outputDiv.scrollTop = outputDiv.scrollHeight;
       }
 
@@ -274,11 +244,9 @@ async function runCodeWithInput() {
         inputLine.className = "input-line active";
 
         input = document.getElementById("console-input");
-     
-        sendButton = document.getElementById("console-button");
-
 
         const submitInput = async () => {
+          if(!data.waitingForInput) return
           const inputValue = input.value;
           if (!inputValue) return;
           outputDiv.innerHTML += `<div class="input-line">${inputValue}</div>`;
@@ -302,20 +270,20 @@ async function runCodeWithInput() {
           input.value = "";
         };
 
-        input.addEventListener("keypress", (e) => {
-          if (e.key === "Enter") {
-            submitInput();
-          }
-        });
-
-        sendButton.onclick = submitInput;
+        if (!input.hasAttribute("data-enter-listener")) {
+          input.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") {
+              submitInput();
+            }
+          });
+          input.setAttribute("data-enter-listener", "true");
+        }
 
         input.focus();
       }
 
       if (data.done) {
         eventSource.close();
-        inputContainer.innerHTML = "";
       }
     };
 

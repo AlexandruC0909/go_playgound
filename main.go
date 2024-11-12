@@ -589,6 +589,11 @@ func handleSendInput(w http.ResponseWriter, r *http.Request) {
 
 func runCodeInteractive(code string, session *ProgramSession) {
 	defer close(session.outputChan)
+	defer func() {
+		session.outputChan <- ProgramOutput{
+			WaitingForInput: false,
+		}
+	}()
 
 	if !validateGoCode(code) {
 		session.outputChan <- ProgramOutput{Error: "invalid or potentially unsafe Go code"}

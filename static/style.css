@@ -187,21 +187,6 @@ div#output.invalid::before {
 
 /* Add these styles to your CSS file */
 
-.input-container {
-  margin-top: 1rem;
-}
-
-.input-line {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-  opacity: 0.7;
-}
-
-.input-line.active {
-  opacity: 1;
-}
-
 .input-field {
   flex: 1;
   padding: 0.5rem;
