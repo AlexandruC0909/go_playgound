@@ -87,11 +87,15 @@ html {
   bottom: 0;
   left: 0;
 }
-
+.righ-side{
+  width: 50%;
+  height: 100%;
+  min-width: 50%;
+}
 #output {
+  min-height: 50%;
   box-sizing: border-box;
   padding: 8px 12px;
-  width: 50%;
   overflow: scroll;
   white-space: pre-wrap;
   background-color: #032240;

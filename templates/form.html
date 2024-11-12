@@ -35,16 +35,7 @@
   </div>
   
   <div class="container">
-    <div class="input-section">
-      <div class="input-header">
-          <h3>Program Input</h3>
-          <div class="input-buttons">
-              <button class="button-1" onclick="addInputLine()">Add Input Line</button>
-              <button class="button-1" onclick="clearInputs()">Clear Inputs</button>
-          </div>
-      </div>
-      <div id="input-container"></div>
-  </div>
+ 
     <label id="editor-label" style="display: none">Code Editor:</label>
     <div id="editor" aria-label="Code Editor" tabindex="0">package main
 
@@ -54,7 +45,17 @@ func main() {
     fmt.Println("Hello, World!")
 }
     </div>
-    <div id="output"></div>
+    <div class="righ-side">
+      <div id="output"></div>
+      <div class="input-section">
+      <div id="input-container">
+        <input class="input-field" type="text" placeholder="Enter input" id="console-input">
+        <button class="send-input" id="console-button" >Send</button>
+        
+      </div>
+    </div>
+   
+  </div>
   </div>
 </body>
 
@@ -62,5 +63,6 @@ func main() {
 <script src="/static/js/theme-cobalt.js"></script>
 <script src="/static/js/mode-golang.js"></script>
 <script src="/static/script.js"></script>
+<script src="/static/resetCode.js"></script>
 
 </html>
