@@ -262,6 +262,10 @@ async function runCodeWithInput() {
         outputDiv.innerHTML += `<div class="error">Error: ${data.error}</div>`;
         cleanupSession(eventSource, inputHandler, inputSection);
         return;
+      } else {
+        outputDiv.classList.remove("error");
+        outputDiv.classList.remove("invalid");
+        outputDiv.classList.remove("success");
       }
 
       if (data.output) {
