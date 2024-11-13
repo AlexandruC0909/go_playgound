@@ -455,12 +455,18 @@ type ProgramSession struct {
 	inputChan  chan string
 	outputChan chan ProgramOutput
 	done       chan struct{}
+	cleanup    sync.Once
+}
+
+func (s *ProgramSession) Close() {
+	s.cleanup.Do(func() {
+		close(s.done)
+		close(s.inputChan)
+	})
 }
 
 var (
-	// Map to store active sessions
 	activeSessions = sync.Map{}
-	// Generate unique session IDs
 	sessionCounter uint64
 )
 
@@ -473,6 +479,15 @@ func newSession() *ProgramSession {
 }
 
 func handleRunWithInput(w http.ResponseWriter, r *http.Request) {
+	if oldSessionIDStr := r.Header.Get("X-Previous-Session"); oldSessionIDStr != "" {
+		if oldSessionID, err := strconv.ParseUint(oldSessionIDStr, 10, 64); err == nil {
+			if oldSession, ok := activeSessions.Load(oldSessionID); ok {
+				oldSession.(*ProgramSession).Close()
+				activeSessions.Delete(oldSessionID)
+			}
+		}
+	}
+
 	var requestData struct {
 		Code string `json:"code"`
 	}
@@ -482,21 +497,18 @@ func handleRunWithInput(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate new session ID
 	sessionID := atomic.AddUint64(&sessionCounter, 1)
 	session := newSession()
 
-	// Store session
 	activeSessions.Store(sessionID, session)
 
-	// Start program execution in goroutine
 	go func() {
+		defer session.Close()
+		defer activeSessions.Delete(sessionID)
 		runCodeInteractive(requestData.Code, session)
-		activeSessions.Delete(sessionID)
-		close(session.done)
+
 	}()
 
-	// Return session ID to client
 	json.NewEncoder(w).Encode(map[string]uint64{"sessionId": sessionID})
 }
 
@@ -589,18 +601,15 @@ func handleSendInput(w http.ResponseWriter, r *http.Request) {
 
 func runCodeInteractive(code string, session *ProgramSession) {
 	defer close(session.outputChan)
-	defer func() {
-		session.outputChan <- ProgramOutput{
-			WaitingForInput: false,
-		}
-	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	if !validateGoCode(code) {
 		session.outputChan <- ProgramOutput{Error: "invalid or potentially unsafe Go code"}
 		return
 	}
 
-	ctx := context.Background()
 	tempDir, err := os.MkdirTemp("", "goplayground")
 	if err != nil {
 		session.outputChan <- ProgramOutput{Error: err.Error()}

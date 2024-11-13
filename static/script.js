@@ -194,119 +194,130 @@ document.querySelector(".dropdown").addEventListener("mouseleave", function () {
 
 async function runCodeWithInput() {
   const outputDiv = document.getElementById("output");
-
   const code = editor.getValue();
+  const inputSection = document.getElementById("input-section");
   let sessionId;
 
+  // Clear previous output and hide input section
+  outputDiv.innerHTML = '';
+  inputSection.classList.remove("display");
+  inputSection.classList.add("display-none");
+
   try {
-    // Start program execution and get session ID
-    const response = await fetch("/run-with-input", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        code: code,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        "Server error: " + response.statusText + "\n" + errorText
-      );
-    }
-
-    const result = await response.json();
-    sessionId = result.sessionId;
-
-    // Close any existing EventSource
-    if (window.currentEventSource) {
-      window.currentEventSource.close();
-    }
-
-    // Set up SSE for getting program output
-    const eventSource = new EventSource(
-      `/program-output?sessionId=${sessionId}`
-    );
-    window.currentEventSource = eventSource;
-
-    eventSource.onmessage = async (event) => {
-      const data = JSON.parse(event.data);
-
-      if (data.error) {
-        outputDiv.innerHTML += `<div class="error">${data.error}</div>`;
-        eventSource.close();
-        return;
+      // Close any existing EventSource
+      if (window.currentEventSource) {
+          window.currentEventSource.close();
       }
 
-      if (data.output) {
-        outputDiv.innerHTML +=  `<div>${data.output}</div>`;
-        outputDiv.scrollTop = outputDiv.scrollHeight;
+      // Start program execution and get session ID
+      const response = await fetch("/run-with-input", {
+          method: "POST",
+          headers: {
+              "Content-Type": "application/json",
+              "X-Previous-Session": window.currentSessionId || "" // Send previous session ID
+          },
+          body: JSON.stringify({
+              code: code,
+          }),
+      });
+
+      if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error("Server error: " + response.statusText + "\n" + errorText);
       }
 
-      if (data.waitingForInput) {
-        const inputSection = document.getElementById("input-section");
-        inputSection.classList.remove("display-none");
-        inputSection.classList.add("display");
-        
-        const inputLine = document.createElement("div");
-        inputLine.className = "input-line active";
+      const result = await response.json();
+      sessionId = result.sessionId;
+      window.currentSessionId = sessionId; // Store current session ID
 
-        input = document.getElementById("console-input");
+      // Set up SSE for getting program output
+      const eventSource = new EventSource(`/program-output?sessionId=${sessionId}`);
+      window.currentEventSource = eventSource;
 
-        const submitInput = async () => {
-          if(!data.waitingForInput) return
-          const inputValue = input.value;
-          if (!inputValue) return;
-          outputDiv.innerHTML += `<div class="input-line">${inputValue}</div>`;
+      let inputHandler;
+      
+      eventSource.onmessage = async (event) => {
+          const data = JSON.parse(event.data);
 
-          try {
-            const response = await fetch(`/send-input?sessionId=${sessionId}`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ input: inputValue }),
-            });
-
-            if (!response.ok) {
-              throw new Error(await response.text());
-            }
-          } catch (error) {
-            outputDiv.innerHTML += `<div class="error">Failed to send input: ${error.message}</div>`;
-            eventSource.close();
+          if (data.error) {
+              outputDiv.innerHTML += `\n${data.error}\n`;
+              eventSource.close();
+              inputSection.classList.remove("display");
+              inputSection.classList.add("display-none");
+              return;
           }
-          input.value = "";
-        };
 
-        if (!input.hasAttribute("data-enter-listener")) {
-          input.addEventListener("keypress", (e) => {
-            if (e.key === "Enter") {
-              submitInput();
-            }
-          });
-          input.setAttribute("data-enter-listener", "true");
-        }
-       
-        input.focus();
-      }
+          if (data.output) {
+              outputDiv.innerHTML += `\n${data.output}\n`;
+              outputDiv.scrollTop = outputDiv.scrollHeight;
+          }
 
-      if (data.done) {
-        inputSection.classList.remove("display");
-        inputSection.classList.add("display-none");
+          if (data.waitingForInput) {
+              inputSection.classList.remove("display-none");
+              inputSection.classList.add("display");
 
-        eventSource.close();
-        outputDiv.innerHTML += `<div class="info">Program finished</div>`;
-      }
-    };
+              const input = document.getElementById("console-input");
+              input.value = "";
+              input.focus();
 
-    eventSource.onerror = (error) => {
-      console.error("EventSource error:", error);
-      eventSource.close();
-      outputDiv.innerHTML += `<div class="error">Connection error</div>`;
-    };
+              // Remove previous input handler if it exists
+              if (inputHandler) {
+                  input.removeEventListener("keypress", inputHandler);
+              }
+
+              // Create new input handler
+              inputHandler = async (e) => {
+                  if (e.key === "Enter") {
+                      const inputValue = input.value;
+                      if (!inputValue) return;
+
+                      outputDiv.innerHTML += `\n${inputValue}\n`;
+                      
+                      try {
+                          const response = await fetch(`/send-input?sessionId=${sessionId}`, {
+                              method: "POST",
+                              headers: {
+                                  "Content-Type": "application/json",
+                              },
+                              body: JSON.stringify({ input: inputValue }),
+                          });
+
+                          if (!response.ok) {
+                              throw new Error(await response.text());
+                          }
+                      } catch (error) {
+                          outputDiv.innerHTML += `\nFailed to send input: ${error.message}\n`;
+                          eventSource.close();
+                      }
+
+                      input.value = "";
+                  }
+              };
+
+              input.addEventListener("keypress", inputHandler);
+          }
+
+          if (data.done) {
+              inputSection.classList.remove("display");
+              inputSection.classList.add("display-none");
+              if (inputHandler) {
+                  document.getElementById("console-input").removeEventListener("keypress", inputHandler);
+              }
+              eventSource.close();
+              outputDiv.innerHTML += `\nProgram finished\n`;
+          }
+      };
+
+      eventSource.onerror = (error) => {
+          console.error("EventSource error:", error);
+          eventSource.close();
+          inputSection.classList.remove("display");
+          inputSection.classList.add("display-none");
+          outputDiv.innerHTML += `\nConnection error\n`;
+      };
   } catch (error) {
-    outputDiv.innerHTML += `<div class="error">Error: ${error.message}</div>`;
+      outputDiv.innerHTML += `\nError: ${error.message}\n`;
+      inputSection.classList.remove("display");
+      inputSection.classList.add("display-none");
   }
 }
