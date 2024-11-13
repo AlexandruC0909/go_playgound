@@ -30,7 +30,7 @@ editor.commands.addCommand({
 });
 
 function runCode() {
-  if (currentExample == 6) {
+  if (currentExample >= 6) {
     runCodeWithInput();
   } else {
     runStaticCode();
@@ -269,6 +269,9 @@ async function runCodeWithInput() {
       }
 
       if (data.output) {
+        if(data.output.includes(`\x0c`)) {
+          outputDiv.innerHTML = "";
+        }
         outputDiv.innerHTML += `<div class="output-line">${data.output}</div>`;
         outputDiv.scrollTop = outputDiv.scrollHeight;
       }
