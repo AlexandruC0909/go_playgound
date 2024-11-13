@@ -29,52 +29,6 @@ editor.commands.addCommand({
   readOnly: false,
 });
 
-function runCode() {
-  if (currentExample >= 6) {
-    runCodeWithInput();
-  } else {
-    runStaticCode();
-  }
-}
-function runStaticCode() {
-  const outputDiv = document.getElementById("output");
-  var code = editor.getValue();
-
-  fetch("/run", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ code: code }),
-  })
-    .then((response) => {
-      if (!response.ok) {
-        return response.text().then((errorText) => {
-          throw new Error(
-            "Server error: " + response.statusText + "\n" + errorText
-          );
-        });
-      }
-      return response.text();
-    })
-    .then((output) => {
-      outputDiv.classList.remove("error");
-      outputDiv.classList.remove("invalid");
-      outputDiv.classList.add("success");
-      outputDiv.textContent = output;
-    })
-    .catch((error) => {
-      outputDiv.textContent = "Error: " + error.message;
-      outputDiv.classList.remove("success");
-      var error = error.message;
-      if (error.includes("invalid or potentially unsafe Go code")) {
-        outputDiv.classList.add("invalid");
-      } else {
-        outputDiv.classList.add("error");
-      }
-    });
-}
-
 function saveCode() {
   var code = editor.getValue();
   var cursorPosition = editor.getCursorPosition();
@@ -192,7 +146,7 @@ document.querySelector(".dropdown").addEventListener("mouseleave", function () {
   document.querySelector(".dropdown-content").style.display = "none";
 });
 
-async function runCodeWithInput() {
+async function runCode() {
   const outputDiv = document.getElementById("output");
   const code = editor.getValue();
   const inputSection = document.getElementById("input-section");
@@ -219,7 +173,7 @@ async function runCodeWithInput() {
 
   try {
     // Start program execution and get session ID
-    const response = await fetch("/run-with-input", {
+    const response = await fetch("/run", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -277,8 +231,10 @@ async function runCodeWithInput() {
       }
 
       if (data.waitingForInput) {
-        inputSection.classList.remove("display-none");
-        inputSection.classList.add("display");
+        inputSection.classList.remove("no-height");
+        inputSection.classList.add("semi-height");
+        outputDiv.classList.remove('full-height');
+        outputDiv.classList.add('semi-height');
 
         const input = document.getElementById("console-input");
         input.value = "";
@@ -323,6 +279,11 @@ async function runCodeWithInput() {
 
         window.currentInputHandler = inputHandler;
         input.addEventListener("keypress", inputHandler);
+      } else{
+        inputSection.classList.remove("semi-height");
+        inputSection.classList.add("no-height");
+        outputDiv.classList.remove('semi-height');
+        outputDiv.classList.add('full-height');
       }
       
       if(data.done){

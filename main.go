@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"go/format"
 	"html/template"
@@ -153,7 +152,6 @@ func main() {
 	http.HandleFunc("/health", handleHealth)
 	http.HandleFunc("/save", handleSave)
 	http.HandleFunc("/robots.txt", handleRobots)
-	http.HandleFunc("/run-with-input", handleRunWithInput)
 	http.HandleFunc("/program-output", handleProgramOutput)
 	http.HandleFunc("/send-input", handleSendInput)
 
@@ -194,36 +192,6 @@ func handleRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var requestData struct {
-		Code string `json:"code"`
-	}
-
-	err := json.NewDecoder(r.Body).Decode(&requestData)
-	if err != nil {
-		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
-		return
-	}
-
-	if len(requestData.Code) > maxCodeSize {
-		http.Error(w, fmt.Sprintf("Code size exceeds maximum limit of %d bytes", maxCodeSize), http.StatusBadRequest)
-		return
-	}
-
-	output, err := runCode(requestData.Code)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if len(output) > maxOutputSize {
-		http.Error(w, fmt.Sprintf("Output size exceeds maximum limit of %d bytes", maxOutputSize), http.StatusBadRequest)
-		return
-	}
-
-	fmt.Fprintln(w, output)
-}
-
-func handleRunWithInput(w http.ResponseWriter, r *http.Request) {
 	if oldSessionIDStr := r.Header.Get("X-Previous-Session"); oldSessionIDStr != "" {
 		if oldSessionID, err := strconv.ParseUint(oldSessionIDStr, 10, 64); err == nil {
 			if oldSession, ok := activeSessions.Load(oldSessionID); ok {
@@ -250,7 +218,7 @@ func handleRunWithInput(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		defer session.Close()
 		defer activeSessions.Delete(sessionID)
-		runCodeInteractive(requestData.Code, session)
+		runCode(requestData.Code, session)
 
 	}()
 
@@ -304,69 +272,12 @@ func handleRobots(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write(robotsTxt)
 }
-
-func runCode(code string) (string, error) {
+func runCode(code string, session *ProgramSession) {
 	start := time.Now()
 	defer func() {
 		log.Printf("Code execution took: %v\n", time.Since(start))
 	}()
-	var ErrInvalidGoCode = errors.New("invalid or potentially unsafe Go code")
-	if !validateGoCode(code) {
-		return "", fmt.Errorf(`%w`, ErrInvalidGoCode)
-	}
 
-	log.Println("Creating temporary directory...")
-	tempDir, err := os.MkdirTemp("", "goplayground")
-	if err != nil {
-		return "", err
-	}
-	defer os.RemoveAll(tempDir)
-
-	tempFile := filepath.Join(tempDir, "main.go")
-	if err := os.WriteFile(tempFile, []byte(code), 0600); err != nil {
-		return "", err
-	}
-
-	ctx := context.Background()
-	log.Println("Copying code to container...")
-	tar := createTarFromFile(tempFile)
-	if err := localClient.CopyToContainer(ctx, containerID, "/code", tar, container.CopyToContainerOptions{}); err != nil {
-		return "", fmt.Errorf("failed to copy code to container: %v", err)
-	}
-
-	log.Println("Creating exec instance...")
-	execConfig := container.ExecOptions{
-		Cmd:          []string{"go", "run", "/code/main.go"},
-		WorkingDir:   "/code",
-		AttachStdout: true,
-		AttachStderr: true,
-	}
-
-	execResp, err := localClient.ContainerExecCreate(ctx, containerID, execConfig)
-	if err != nil {
-		return "", fmt.Errorf("failed to create exec: %v", err)
-	}
-
-	log.Println("Starting exec instance...")
-	response, err := localClient.ContainerExecAttach(ctx, execResp.ID, container.ExecStartOptions{})
-	if err != nil {
-		return "", fmt.Errorf("failed to attach to exec: %v", err)
-	}
-	defer response.Close()
-
-	var stdout, stderr bytes.Buffer
-	if _, err := stdcopy.StdCopy(&stdout, &stderr, response.Reader); err != nil {
-		return "", fmt.Errorf("failed to read exec output: %v", err)
-	}
-
-	if stderr.Len() > 0 {
-		return "", fmt.Errorf("execution error: %s", stderr.String())
-	}
-
-	return stdout.String(), nil
-}
-
-func runCodeInteractive(code string, session *ProgramSession) {
 	defer close(session.outputChan)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
