@@ -219,8 +219,7 @@ async function runCodeWithInput() {
 
   try {
     // Start program execution and get session ID
-    const response = 
-    await fetch("/run-with-input", {
+    const response = await fetch("/run-with-input", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -229,7 +228,7 @@ async function runCodeWithInput() {
       body: JSON.stringify({
         code: code,
       }),
-    })
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -254,8 +253,13 @@ async function runCodeWithInput() {
       const data = JSON.parse(event.data);
 
       if (data.error) {
-       
-        outputDiv.innerHTML += `<div>${data.error}</div>`;
+        outputDiv.classList.remove("success");
+        if (data.error.includes("invalid or potentially unsafe Go code")) {
+          outputDiv.classList.add("invalid");
+        } else {
+          outputDiv.classList.add("error");
+        }
+        outputDiv.innerHTML += `<div class="error">Error: ${data.error}</div>`;
         cleanupSession(eventSource, inputHandler, inputSection);
         return;
       }
@@ -312,7 +316,9 @@ async function runCodeWithInput() {
 
         window.currentInputHandler = inputHandler;
         input.addEventListener("keypress", inputHandler);
-      } else {
+      }
+      
+      if(data.done){
         outputDiv.classList.remove("error");
         outputDiv.classList.remove("invalid");
         outputDiv.classList.add("success");
@@ -327,16 +333,8 @@ async function runCodeWithInput() {
       outputDiv.innerHTML += `<div class="error">Connection error</divclass=>`;
     };
   } catch (error) {
-    outputDiv.classList.remove("success");
-    if (data.error.includes("invalid or potentially unsafe Go code")) {
-      outputDiv.classList.add("invalid");
-    } else {
-      outputDiv.classList.add("error");
-    }
-    outputDiv.innerHTML += `<div class="error">Error: ${error.message}</divclass=>`;
     inputSection.classList.remove("display");
     inputSection.classList.add("display-none");
-
   }
 }
 

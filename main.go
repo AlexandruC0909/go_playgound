@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -601,31 +602,96 @@ func handleSendInput(w http.ResponseWriter, r *http.Request) {
 
 func runCodeInteractive(code string, session *ProgramSession) {
 	defer close(session.outputChan)
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if !validateGoCode(code) {
-		session.outputChan <- ProgramOutput{Error: "invalid or potentially unsafe Go code"}
+		session.outputChan <- ProgramOutput{
+			Error: "invalid or potentially unsafe Go code",
+			Done:  true,
+		}
 		return
 	}
 
 	tempDir, err := os.MkdirTemp("", "goplayground")
 	if err != nil {
-		session.outputChan <- ProgramOutput{Error: err.Error()}
+		session.outputChan <- ProgramOutput{
+			Error: err.Error(),
+			Done:  true,
+		}
 		return
 	}
 	defer os.RemoveAll(tempDir)
 
 	tempFile := filepath.Join(tempDir, "main.go")
 	if err := os.WriteFile(tempFile, []byte(code), 0600); err != nil {
-		session.outputChan <- ProgramOutput{Error: err.Error()}
+		session.outputChan <- ProgramOutput{
+			Error: err.Error(),
+			Done:  true,
+		}
 		return
 	}
 
 	tar := createTarFromFile(tempFile)
 	if err := localClient.CopyToContainer(ctx, containerID, "/code", tar, container.CopyToContainerOptions{}); err != nil {
-		session.outputChan <- ProgramOutput{Error: fmt.Sprintf("failed to copy code to container: %v", err)}
+		session.outputChan <- ProgramOutput{
+			Error: fmt.Sprintf("failed to copy code to container: %v", err),
+			Done:  true,
+		}
+		return
+	}
+
+	// First, try to compile the code
+	compileConfig := container.ExecOptions{
+		Cmd:          []string{"go", "build", "-o", "/dev/null", "/code/main.go"},
+		WorkingDir:   "/code",
+		AttachStdout: true,
+		AttachStderr: true,
+	}
+
+	compileResp, err := localClient.ContainerExecCreate(ctx, containerID, compileConfig)
+	if err != nil {
+		session.outputChan <- ProgramOutput{
+			Error: fmt.Sprintf("failed to create compile exec: %v", err),
+			Done:  true,
+		}
+		return
+	}
+
+	compileAttach, err := localClient.ContainerExecAttach(ctx, compileResp.ID, container.ExecStartOptions{})
+	if err != nil {
+		session.outputChan <- ProgramOutput{
+			Error: fmt.Sprintf("failed to attach to compile exec: %v", err),
+			Done:  true,
+		}
+		return
+	}
+	defer compileAttach.Close()
+
+	var compileStdout, compileStderr bytes.Buffer
+	if _, err := stdcopy.StdCopy(&compileStdout, &compileStderr, compileAttach.Reader); err != nil {
+		session.outputChan <- ProgramOutput{
+			Error: fmt.Sprintf("failed to read compile output: %v", err),
+			Done:  true,
+		}
+		return
+	}
+
+	compileResult, err := localClient.ContainerExecInspect(ctx, compileResp.ID)
+	if err != nil {
+		session.outputChan <- ProgramOutput{
+			Error: fmt.Sprintf("failed to inspect compile exec: %v", err),
+			Done:  true,
+		}
+		return
+	}
+
+	if compileResult.ExitCode != 0 {
+		session.outputChan <- ProgramOutput{
+			Error:           compileStderr.String(),
+			Done:            true,
+			WaitingForInput: false,
+		}
 		return
 	}
 
@@ -640,41 +706,80 @@ func runCodeInteractive(code string, session *ProgramSession) {
 
 	execResp, err := localClient.ContainerExecCreate(ctx, containerID, execConfig)
 	if err != nil {
-		session.outputChan <- ProgramOutput{Error: fmt.Sprintf("failed to create exec: %v", err)}
+		session.outputChan <- ProgramOutput{
+			Error: fmt.Sprintf("failed to create exec: %v", err),
+			Done:  true,
+		}
 		return
 	}
 
 	response, err := localClient.ContainerExecAttach(ctx, execResp.ID, container.ExecStartOptions{})
 	if err != nil {
-		session.outputChan <- ProgramOutput{Error: fmt.Sprintf("failed to attach to exec: %v", err)}
+		session.outputChan <- ProgramOutput{
+			Error: fmt.Sprintf("failed to attach to exec: %v", err),
+			Done:  true,
+		}
 		return
 	}
 	defer response.Close()
 
+	reader := bufio.NewReader(response.Reader)
+	outputDone := make(chan struct{})
+
+	// Handle program output and errors
 	go func() {
-		if _, err := response.Reader.Read(make([]byte, 1)); err != nil {
-			if err == io.EOF {
+		defer close(outputDone)
+		for {
+			header := make([]byte, 8)
+			_, err := reader.Read(header)
+			if err != nil {
+				if err != io.EOF {
+					session.outputChan <- ProgramOutput{
+						Error:           fmt.Sprintf("error reading output: %v", err),
+						Done:            true,
+						WaitingForInput: false,
+					}
+				} else {
+					// Send final output with Done: true on EOF
+					session.outputChan <- ProgramOutput{
+						Done:            true,
+						WaitingForInput: false,
+					}
+				}
+				return
+			}
+
+			streamType := header[0]
+			size := int64(binary.BigEndian.Uint32(header[4:]))
+
+			content := make([]byte, size)
+			_, err = io.ReadFull(reader, content)
+			if err != nil {
 				session.outputChan <- ProgramOutput{
+					Error:           fmt.Sprintf("error reading content: %v", err),
+					Done:            true,
 					WaitingForInput: false,
 				}
-			} else {
-				session.outputChan <- ProgramOutput{Error: fmt.Sprintf("program output read error: %v", err)}
+				return
 			}
-		}
-	}()
 
-	// Handle program output
+			var output ProgramOutput
+			if streamType == 2 { // stderr
+				output = ProgramOutput{
+					Error:           string(content),
+					WaitingForInput: false,
+				}
+			} else { // stdout
+				output = ProgramOutput{
+					Output:          string(content),
+					WaitingForInput: true,
+				}
+			}
 
-	go func() {
-		scanner := bufio.NewScanner(response.Reader)
-		for scanner.Scan() {
 			select {
 			case <-session.done:
 				return
-			case session.outputChan <- ProgramOutput{
-				Output:          scanner.Text(),
-				WaitingForInput: true,
-			}:
+			case session.outputChan <- output:
 			}
 		}
 	}()
@@ -689,7 +794,9 @@ func runCodeInteractive(code string, session *ProgramSession) {
 			fmt.Fprintln(response.Conn, input)
 		case <-session.done:
 			return
+		case <-outputDone:
+			// Program has finished executing
+			return
 		}
 	}
-
 }
