@@ -92,7 +92,6 @@ html {
   min-width: 50%;
 }
 #output {
-  position: relative;
   box-sizing: border-box;
   padding: 8px 12px;
   overflow: scroll;
@@ -229,7 +228,7 @@ textarea {
     width: 100%;
   }
   #output {
-    height: 75%;
+    min-height: 45%;
   }
   #editor {
     height: 50%;
