@@ -403,9 +403,28 @@ func runCode(code string, session *ProgramSession) {
 	reader := bufio.NewReader(response.Reader)
 	outputDone := make(chan struct{})
 
+	// Add a channel to track the program's running state
+	execDone := make(chan struct{})
+
+	// Start a goroutine to monitor the program's execution state
+	go func() {
+		defer close(execDone)
+		for {
+			inspect, err := localClient.ContainerExecInspect(ctx, execResp.ID)
+			if err != nil {
+				return
+			}
+			if !inspect.Running {
+				return
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
+
 	// Handle program output and errors
 	go func() {
 		defer close(outputDone)
+
 		for {
 			header := make([]byte, 8)
 			_, err := reader.Read(header)
@@ -440,16 +459,29 @@ func runCode(code string, session *ProgramSession) {
 				return
 			}
 
+			outputStr := string(content)
+
+			// Check if the output suggests waiting for input
+			/* 	isWaitingForInput := false
+			select {
+			case <-execDone:
+				// Program has finished executing
+				isWaitingForInput = false
+			default:
+				// Program is still running - check if it's likely waiting for input
+				isWaitingForInput = isInputPrompt(outputStr)
+			} */
+			isInput := isInputPrompt(outputStr)
 			var output ProgramOutput
 			if streamType == 2 { // stderr
 				output = ProgramOutput{
-					Error:           string(content),
+					Error:           outputStr,
 					WaitingForInput: false,
 				}
 			} else { // stdout
 				output = ProgramOutput{
-					Output:          string(content),
-					WaitingForInput: true,
+					Output:          outputStr,
+					WaitingForInput: isInput,
 				}
 			}
 
@@ -473,8 +505,45 @@ func runCode(code string, session *ProgramSession) {
 			return
 		case <-outputDone:
 			return
+		case <-execDone:
+			return
 		}
 	}
+}
+
+// isInputPrompt checks if the output string likely indicates waiting for input
+func isInputPrompt(output string) bool {
+	// Common input prompt patterns
+	inputPatterns := []string{
+		"Input:",
+		"Enter",
+		"Please enter",
+		"Type",
+		"?",
+		">",
+		":",
+	}
+
+	// Trim spaces and newlines
+	output = strings.TrimSpace(output)
+
+	// If the output is empty, it's probably not waiting for input
+	if output == "" {
+		return false
+	}
+
+	// Check if the output ends with common input prompt patterns
+	for _, pattern := range inputPatterns {
+		if strings.HasSuffix(output, pattern) {
+			return true
+		}
+	}
+	return false
+
+	// Check if the last character is a non-newline character
+	// This helps detect custom prompts
+	/* lastChar := output[len(output)-1]
+	return lastChar != '\n' && lastChar != '\r' */
 }
 
 func handleProgramOutput(w http.ResponseWriter, r *http.Request) {
@@ -506,12 +575,6 @@ func handleProgramOutput(w http.ResponseWriter, r *http.Request) {
 	// Create done channel for this connection
 	done := make(chan struct{})
 	defer close(done)
-
-	/* 	// Close connection if client disconnects
-	   	go func() {
-	   		<-r.Context().Done()
-	   		close(done)
-	   	}() */
 
 	for {
 		select {

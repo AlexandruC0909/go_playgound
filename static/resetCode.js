@@ -6,17 +6,6 @@ function resetCode() {
     output.classList.remove('success');
     output.classList.remove('invalid');
     output.textContent = "";
-   /*  if(currentExample < 6) {
-        inputSection.classList.remove("semi-height");
-        inputSection.classList.add("no-height");
-        output.classList.remove('semi-height');
-        output.classList.add('full-height');
-    }else {
-        inputSection.classList.remove("no-height");
-        inputSection.classList.add("semi-height");
-        output.classList.remove('full-height');
-        output.classList.add('semi-height');
-    } */
     switch (currentExample) {
       case 1:
       editor.setValue(`package main
