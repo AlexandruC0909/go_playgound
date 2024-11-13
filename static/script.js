@@ -253,13 +253,22 @@ async function runCodeWithInput() {
       const data = JSON.parse(event.data);
 
       if (data.error) {
+        outputDiv.classList.remove("success");
+        if (data.error.includes("invalid or potentially unsafe Go code")) {
+          outputDiv.classList.add("invalid");
+        } else {
+          outputDiv.classList.add("error");
+        }
         outputDiv.innerHTML += `<div>${data.error}</div>`;
         cleanupSession(eventSource, inputHandler, inputSection);
         return;
       }
 
       if (data.output) {
-        outputDiv.innerHTML += `<div>${data.output}</div>`;
+        outputDiv.classList.remove("error");
+        outputDiv.classList.remove("invalid");
+        outputDiv.classList.add("success");
+        outputDiv.innerHTML += `<div class="output-line">${data.output}</div>`;
         outputDiv.scrollTop = outputDiv.scrollHeight;
       }
 
@@ -282,7 +291,7 @@ async function runCodeWithInput() {
             const inputValue = input.value;
             if (!inputValue) return;
 
-            outputDiv.innerHTML += `<div>${inputValue}</div>`;
+            outputDiv.innerHTML += `<div class="output-line">${inputValue}</div>`;
 
             try {
               const response = await fetch(
@@ -300,7 +309,7 @@ async function runCodeWithInput() {
                 throw new Error(await response.text());
               }
             } catch (error) {
-              outputDiv.innerHTML += `<div>Failed to send input: ${error.message}</div>`;
+              outputDiv.innerHTML += `<div  class="error">Failed to send input: ${error.message}</div>`;
               cleanupSession(eventSource, inputHandler, inputSection);
             }
 
@@ -312,19 +321,20 @@ async function runCodeWithInput() {
         input.addEventListener("keypress", inputHandler);
       } else {
         cleanupSession(eventSource, inputHandler, inputSection);
-        outputDiv.innerHTML += `<div>Program finished</div>`;
+        outputDiv.innerHTML += `<div class="output-line finished-program">Program finished!</div>`;
       }
     };
 
     eventSource.onerror = (error) => {
       console.error("EventSource error:", error);
       cleanupSession(eventSource, inputHandler, inputSection);
-      outputDiv.innerHTML += `<divclass="error">Connection error</divclass=>`;
+      outputDiv.innerHTML += `<div class="error">Connection error</divclass=>`;
     };
   } catch (error) {
-    outputDiv.innerHTML += `<divclass="error">Error: ${error.message}</divclass=>`;
+    outputDiv.innerHTML += `<div class="error">Error: ${error.message}</divclass=>`;
     inputSection.classList.remove("display");
     inputSection.classList.add("display-none");
+
   }
 }
 

@@ -16,7 +16,7 @@ html {
   border-radius: 7px;
   border-style: none;
   box-sizing: border-box;
-  color: #FFFFFF;
+  color: #ffffff;
   cursor: pointer;
   display: inline-block;
   font-size: 14px;
@@ -34,15 +34,13 @@ html {
   -webkit-user-select: none;
   touch-action: manipulation;
 }
-.button-example{
+.button-example {
   background-color: #007d8a;
-
 }
-.button-reset{
+.button-reset {
   background-color: #087da1;
-
 }
-.button-run{
+.button-run {
   background-color: #4679b0;
 }
 
@@ -50,13 +48,13 @@ html {
 .button-1:focus {
   background-color: #004e6f;
 }
-.button-container{
+.button-container {
   margin-right: 20px;
   display: flex;
   align-items: center;
   justify-content: space-around;
 }
-.runButton{
+.runButton {
   margin: 5px;
 }
 .header {
@@ -74,7 +72,7 @@ html {
 }
 
 .container {
-  display: flex; 
+  display: flex;
   height: calc(100dvh - 71px);
   flex-direction: row;
   border-top: 1px solid #a4abbd;
@@ -87,51 +85,48 @@ html {
   bottom: 0;
   left: 0;
 }
-.righ-side{
+.right-side {
   border-left: 1px solid #a4abbd;
   width: 50%;
   height: 100%;
   min-width: 50%;
 }
 #output {
-  min-height: 50%;
-  max-height: 50%;
-  border-bottom: 1px solid #a4abbd;
-
+  position: relative;
   box-sizing: border-box;
   padding: 8px 12px;
   overflow: scroll;
   white-space: pre-wrap;
   background-color: #032240;
   color: #c9c9c9;
-  
 }
 div#output::before {
-  content: '';
+  content: "";
   position: absolute;
-  bottom: 8px; 
+  bottom: 8px;
   right: 12px;
-  width: 20vh;
-  height: 20vh;
+  width: 10vh;
+  height: 10vh;
   background: url("/static/gophers/gopherBuilding.svg") no-repeat center center;
   background-size: contain;
-  opacity: 0.2; 
+  opacity: 0.2;
   pointer-events: none;
 }
 div#output.error::before {
   background: url("/static/gophers/gopherError.svg") no-repeat center center;
   background-size: contain;
-  opacity: 0.2; 
+  opacity: 0.2;
 }
 div#output.success::before {
   background: url("/static/gophers/gopherSuccess.svg") no-repeat center center;
   background-size: contain;
-  opacity: 0.2; 
+  opacity: 0.2;
 }
 div#output.invalid::before {
-  background: url("/static/gophers/gopherInvalidCode.svg") no-repeat center center;
+  background: url("/static/gophers/gopherInvalidCode.svg") no-repeat center
+    center;
   background-size: contain;
-  opacity: 0.2; 
+  opacity: 0.2;
 }
 .dropdown {
   position: relative;
@@ -146,54 +141,23 @@ div#output.invalid::before {
   background-color: #007d8a;
   color: #c9c9c9;
   min-width: 160px;
-  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.5);
+  box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.5);
   z-index: 1;
 }
-.dropdown-content div{
+.dropdown-content div {
   margin: 3px;
   cursor: pointer;
 }
-.dropdown-content div:hover{
-  color:white;
+.dropdown-content div:hover {
+  color: white;
 }
-.dropdown:hover .dropdown-content {display: block;}
-
-@media (max-width: 767px) {
-  div#output::before {
-    position: absolute;
-    width: 13vh;
-    height: 13vh;
-  }
-  .container {
-    flex-direction: column;
-  }
-  .header h2, .button-container {
-    margin-left: 8px;
-    margin-right: 0px;
-  }
-
-  #editor,
-  #output {
-    width: 100%;
-  }
-  #output {
-    height: 35%;
-  }
-  #editor{
-    height: 65%;
-  }
-
-  #output {
-    border-left: none;
-    border-top: 1px solid #c9c9c9;
-}
+.dropdown:hover .dropdown-content {
+  display: block;
 }
 
 
 
 .output-line {
-  margin: 0.25rem 0;
-  font-family: monospace;
   white-space: pre-wrap;
 }
 
@@ -203,15 +167,9 @@ div#output.invalid::before {
   font-family: monospace;
 }
 
-#input-section{
-
+#input-section {
   box-sizing: border-box;
   overflow: scroll;
-  margin: 4px 7px;
-  height: 50%;
-  min-height: 50%;
-  max-height: 50%;
-
 }
 
 textarea {
@@ -225,17 +183,68 @@ textarea {
   border: none;
   overflow: auto;
   outline: none;
-  color:#f5f5f5;
+  color: #f5f5f5;
   -webkit-box-shadow: none;
   -moz-box-shadow: none;
   box-shadow: none;
 
   resize: none;
 }
+.texarea-wrapper {
+  padding: 4px 8px;
+}
 
-.display-none{
+.display-none {
   display: nones;
 }
 .display {
   display: block;
+}
+.finished-program {
+  margin-top:20px;
+}
+
+.full-height {
+  height: 100%;
+}
+.semi-height {
+  height: 50%;
+}
+.no-height {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .container {
+    flex-direction: column;
+  }
+  .header h2,
+  .button-container {
+    margin-left: 8px;
+    margin-right: 0px;
+  }
+
+  #editor,
+  #output {
+    width: 100%;
+  }
+  #output {
+    height: 75%;
+  }
+  #editor {
+    height: 50%;
+  }
+
+  #output {
+    border-left: none;
+    border-top: 1px solid #c9c9c9;
+  }
+  .right-side {
+    border:none;
+    width: 100%;
+    height: 50%;
+  }
+  .semi-height{
+    height: auto;
+  }
 }

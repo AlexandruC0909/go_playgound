@@ -456,7 +456,6 @@ type ProgramSession struct {
 	outputChan chan ProgramOutput
 	done       chan struct{}
 	cleanup    sync.Once
-	Finished   bool
 }
 
 func (s *ProgramSession) Close() {
@@ -645,27 +644,12 @@ func runCodeInteractive(code string, session *ProgramSession) {
 		return
 	}
 
-	/* execCmd, err := localClient.ContainerExecInspect(ctx, execResp.ID)
-	if err != nil {
-		session.outputChan <- ProgramOutput{Error: fmt.Sprintf("failed to inspect exec: %v", err)}
-		return
-	} */
-
 	response, err := localClient.ContainerExecAttach(ctx, execResp.ID, container.ExecStartOptions{})
 	if err != nil {
 		session.outputChan <- ProgramOutput{Error: fmt.Sprintf("failed to attach to exec: %v", err)}
 		return
 	}
 	defer response.Close()
-
-	/* go func() {
-		if execCmd.ExitCode != 0 {
-			session.outputChan <- ProgramOutput{Error: fmt.Sprintf("program execution error: exit code %d", execCmd.ExitCode)}
-		} else {
-			session.Finished = true
-		}
-	}() */
-	// Handle program output
 
 	go func() {
 		if _, err := response.Reader.Read(make([]byte, 1)); err != nil {
@@ -679,6 +663,8 @@ func runCodeInteractive(code string, session *ProgramSession) {
 		}
 	}()
 
+	// Handle program output
+
 	go func() {
 		scanner := bufio.NewScanner(response.Reader)
 		for scanner.Scan() {
@@ -687,7 +673,7 @@ func runCodeInteractive(code string, session *ProgramSession) {
 				return
 			case session.outputChan <- ProgramOutput{
 				Output:          scanner.Text(),
-				WaitingForInput: !session.Finished,
+				WaitingForInput: true,
 			}:
 			}
 		}
