@@ -456,6 +456,7 @@ type ProgramSession struct {
 	outputChan chan ProgramOutput
 	done       chan struct{}
 	cleanup    sync.Once
+	Finished   bool
 }
 
 func (s *ProgramSession) Close() {
@@ -542,11 +543,11 @@ func handleProgramOutput(w http.ResponseWriter, r *http.Request) {
 	done := make(chan struct{})
 	defer close(done)
 
-	// Close connection if client disconnects
-	go func() {
-		<-r.Context().Done()
-		close(done)
-	}()
+	/* 	// Close connection if client disconnects
+	   	go func() {
+	   		<-r.Context().Done()
+	   		close(done)
+	   	}() */
 
 	for {
 		select {
@@ -644,6 +645,12 @@ func runCodeInteractive(code string, session *ProgramSession) {
 		return
 	}
 
+	/* execCmd, err := localClient.ContainerExecInspect(ctx, execResp.ID)
+	if err != nil {
+		session.outputChan <- ProgramOutput{Error: fmt.Sprintf("failed to inspect exec: %v", err)}
+		return
+	} */
+
 	response, err := localClient.ContainerExecAttach(ctx, execResp.ID, container.ExecStartOptions{})
 	if err != nil {
 		session.outputChan <- ProgramOutput{Error: fmt.Sprintf("failed to attach to exec: %v", err)}
@@ -651,7 +658,27 @@ func runCodeInteractive(code string, session *ProgramSession) {
 	}
 	defer response.Close()
 
+	/* go func() {
+		if execCmd.ExitCode != 0 {
+			session.outputChan <- ProgramOutput{Error: fmt.Sprintf("program execution error: exit code %d", execCmd.ExitCode)}
+		} else {
+			session.Finished = true
+		}
+	}() */
 	// Handle program output
+
+	go func() {
+		if _, err := response.Reader.Read(make([]byte, 1)); err != nil {
+			if err == io.EOF {
+				session.outputChan <- ProgramOutput{
+					WaitingForInput: false,
+				}
+			} else {
+				session.outputChan <- ProgramOutput{Error: fmt.Sprintf("program output read error: %v", err)}
+			}
+		}
+	}()
+
 	go func() {
 		scanner := bufio.NewScanner(response.Reader)
 		for scanner.Scan() {
@@ -660,7 +687,7 @@ func runCodeInteractive(code string, session *ProgramSession) {
 				return
 			case session.outputChan <- ProgramOutput{
 				Output:          scanner.Text(),
-				WaitingForInput: true,
+				WaitingForInput: !session.Finished,
 			}:
 			}
 		}
@@ -678,4 +705,5 @@ func runCodeInteractive(code string, session *ProgramSession) {
 			return
 		}
 	}
+
 }

@@ -1,11 +1,15 @@
 
 function resetCode() {
-    currentExample
-    let output = document.getElementById("output")
+    const output = document.getElementById("output")
+    const inputSection = document.getElementById("input-section")
     output.classList.remove('error');
     output.classList.remove('success');
     output.classList.remove('invalid');
     output.textContent = "";
+    if(currentExample !== 6) {
+        inputSection.classList.remove("display");
+        inputSection.classList.add("display-none");
+    }
     switch (currentExample) {
       case 1:
       editor.setValue(`package main

@@ -29,8 +29,8 @@ editor.commands.addCommand({
   readOnly: false,
 });
 
-function runCode(){
-  if(currentExample == 6){
+function runCode() {
+  if (currentExample == 6) {
     runCodeWithInput();
   } else {
     runStaticCode();
@@ -199,13 +199,15 @@ async function runCodeWithInput() {
   let sessionId;
 
   // Clear previous output and hide input section
-  outputDiv.innerHTML = '';
+  outputDiv.innerHTML = "";
   inputSection.classList.remove("display");
   inputSection.classList.add("display-none");
 
   // Clean up any existing event handlers
   if (window.currentInputHandler) {
-    document.getElementById("console-input").removeEventListener("keypress", window.currentInputHandler);
+    document
+      .getElementById("console-input")
+      .removeEventListener("keypress", window.currentInputHandler);
     window.currentInputHandler = null;
   }
 
@@ -221,7 +223,7 @@ async function runCodeWithInput() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Previous-Session": window.currentSessionId || ""
+        "X-Previous-Session": window.currentSessionId || "",
       },
       body: JSON.stringify({
         code: code,
@@ -230,7 +232,9 @@ async function runCodeWithInput() {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error("Server error: " + response.statusText + "\n" + errorText);
+      throw new Error(
+        "Server error: " + response.statusText + "\n" + errorText
+      );
     }
 
     const result = await response.json();
@@ -238,22 +242,24 @@ async function runCodeWithInput() {
     window.currentSessionId = sessionId;
 
     // Set up SSE for getting program output
-    const eventSource = new EventSource(`/program-output?sessionId=${sessionId}`);
+    const eventSource = new EventSource(
+      `/program-output?sessionId=${sessionId}`
+    );
     window.currentEventSource = eventSource;
 
     let inputHandler;
-    
+
     eventSource.onmessage = async (event) => {
       const data = JSON.parse(event.data);
 
       if (data.error) {
-        outputDiv.innerHTML += `\n${data.error}\n`;
+        outputDiv.innerHTML += `<div>${data.error}</div>`;
         cleanupSession(eventSource, inputHandler, inputSection);
         return;
       }
 
       if (data.output) {
-        outputDiv.innerHTML += `\n${data.output}\n`;
+        outputDiv.innerHTML += `<div>${data.output}</div>`;
         outputDiv.scrollTop = outputDiv.scrollHeight;
       }
 
@@ -276,22 +282,25 @@ async function runCodeWithInput() {
             const inputValue = input.value;
             if (!inputValue) return;
 
-            outputDiv.innerHTML += `\n${inputValue}\n`;
-            
+            outputDiv.innerHTML += `<div>${inputValue}</div>`;
+
             try {
-              const response = await fetch(`/send-input?sessionId=${sessionId}`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ input: inputValue }),
-              });
+              const response = await fetch(
+                `/send-input?sessionId=${sessionId}`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({ input: inputValue }),
+                }
+              );
 
               if (!response.ok) {
                 throw new Error(await response.text());
               }
             } catch (error) {
-              outputDiv.innerHTML += `\nFailed to send input: ${error.message}\n`;
+              outputDiv.innerHTML += `<div>Failed to send input: ${error.message}</div>`;
               cleanupSession(eventSource, inputHandler, inputSection);
             }
 
@@ -301,21 +310,19 @@ async function runCodeWithInput() {
 
         window.currentInputHandler = inputHandler;
         input.addEventListener("keypress", inputHandler);
-      }
-
-      if (data.done) {
+      } else {
         cleanupSession(eventSource, inputHandler, inputSection);
-        outputDiv.innerHTML += `\nProgram finished\n`;
+        outputDiv.innerHTML += `<div>Program finished</div>`;
       }
     };
 
     eventSource.onerror = (error) => {
       console.error("EventSource error:", error);
       cleanupSession(eventSource, inputHandler, inputSection);
-      outputDiv.innerHTML += `\nConnection error\n`;
+      outputDiv.innerHTML += `<divclass="error">Connection error</divclass=>`;
     };
   } catch (error) {
-    outputDiv.innerHTML += `\nError: ${error.message}\n`;
+    outputDiv.innerHTML += `<divclass="error">Error: ${error.message}</divclass=>`;
     inputSection.classList.remove("display");
     inputSection.classList.add("display-none");
   }
@@ -327,12 +334,14 @@ function cleanupSession(eventSource, inputHandler, inputSection) {
     eventSource.close();
     window.currentEventSource = null;
   }
-  
+
   if (inputHandler) {
-    document.getElementById("console-input").removeEventListener("keypress", inputHandler);
+    document
+      .getElementById("console-input")
+      .removeEventListener("keypress", inputHandler);
     window.currentInputHandler = null;
   }
-  
+
   inputSection.classList.remove("display");
   inputSection.classList.add("display-none");
 }
