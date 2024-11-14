@@ -184,57 +184,6 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleRun(w http.ResponseWriter, r *http.Request) {
-	start := time.Now()
-	defer func() {
-		log.Printf("Total request handling took: %v\n", time.Since(start))
-	}()
-
-	ip := r.RemoteAddr
-	if forwardedFor := r.Header.Get("X-Forwarded-For"); forwardedFor != "" {
-		ip = strings.Split(forwardedFor, ",")[0]
-	}
-
-	// Apply rate limiting
-	limiter := rateLimiter.getLimiter(ip)
-	if !limiter.Allow() {
-		http.Error(w, "Rate limit exceeded. Please try again later.", http.StatusTooManyRequests)
-		return
-	}
-
-	/* if oldSessionIDStr := r.Header.Get("X-Previous-Session"); oldSessionIDStr != "" {
-		if oldSessionID, err := strconv.ParseUint(oldSessionIDStr, 10, 64); err == nil {
-			if oldSession, ok := activeSessions.Load(oldSessionID); ok {
-				oldSession.(*ProgramSession).Close()
-				activeSessions.Delete(oldSessionID)
-			}
-		}
-	} */
-
-	var requestData struct {
-		Code string `json:"code"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
-		return
-	}
-
-	sessionID := atomic.AddUint64(&sessionCounter, 1)
-	session := newSession()
-
-	activeSessions.Store(sessionID, session)
-
-	go func() {
-		defer session.Close()
-		defer activeSessions.Delete(sessionID)
-		runCode(requestData.Code, session)
-
-	}()
-
-	json.NewEncoder(w).Encode(map[string]uint64{"sessionId": sessionID})
-}
-
 func handleSave(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
@@ -281,255 +230,6 @@ func handleRobots(w http.ResponseWriter, r *http.Request) {
 	robotsTxt := []byte("User-agent: *\nDisallow: /private/")
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write(robotsTxt)
-}
-func runCode(code string, session *ProgramSession) {
-	start := time.Now()
-	defer func() {
-		log.Printf("Code execution took: %v\n", time.Since(start))
-	}()
-
-	defer close(session.outputChan)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	inputOps, err := detectInputOperations(code)
-	if err != nil {
-		session.outputChan <- ProgramOutput{
-			Error: fmt.Sprintf("Failed to analyze code for input operations: %v", err),
-			Done:  true,
-		}
-		return
-	}
-	session.detectedInputOps = inputOps
-
-	if !validateGoCode(code) {
-		session.outputChan <- ProgramOutput{
-			Error: "invalid or potentially unsafe Go code",
-			Done:  true,
-		}
-		return
-	}
-
-	tempDir, err := os.MkdirTemp("", "goplayground")
-	if err != nil {
-		session.outputChan <- ProgramOutput{
-			Error: err.Error(),
-			Done:  true,
-		}
-		return
-	}
-	defer os.RemoveAll(tempDir)
-
-	tempFile := filepath.Join(tempDir, "main.go")
-	if err := os.WriteFile(tempFile, []byte(code), 0600); err != nil {
-		session.outputChan <- ProgramOutput{
-			Error: err.Error(),
-			Done:  true,
-		}
-		return
-	}
-
-	tar := createTarFromFile(tempFile)
-	if err := localClient.CopyToContainer(ctx, containerID, "/code", tar, container.CopyToContainerOptions{}); err != nil {
-		session.outputChan <- ProgramOutput{
-			Error: fmt.Sprintf("failed to copy code to container: %v", err),
-			Done:  true,
-		}
-		return
-	}
-
-	// First, try to compile the code
-	compileConfig := container.ExecOptions{
-		Cmd:          []string{"go", "build", "-o", "/dev/null", "/code/main.go"},
-		WorkingDir:   "/code",
-		AttachStdout: true,
-		AttachStderr: true,
-	}
-
-	compileResp, err := localClient.ContainerExecCreate(ctx, containerID, compileConfig)
-	if err != nil {
-		session.outputChan <- ProgramOutput{
-			Error: fmt.Sprintf("failed to create compile exec: %v", err),
-			Done:  true,
-		}
-		return
-	}
-
-	compileAttach, err := localClient.ContainerExecAttach(ctx, compileResp.ID, container.ExecStartOptions{})
-	if err != nil {
-		session.outputChan <- ProgramOutput{
-			Error: fmt.Sprintf("failed to attach to compile exec: %v", err),
-			Done:  true,
-		}
-		return
-	}
-	defer compileAttach.Close()
-
-	var compileStdout, compileStderr bytes.Buffer
-	if _, err := stdcopy.StdCopy(&compileStdout, &compileStderr, compileAttach.Reader); err != nil {
-		session.outputChan <- ProgramOutput{
-			Error: fmt.Sprintf("failed to read compile output: %v", err),
-			Done:  true,
-		}
-		return
-	}
-
-	compileResult, err := localClient.ContainerExecInspect(ctx, compileResp.ID)
-	if err != nil {
-		session.outputChan <- ProgramOutput{
-			Error: fmt.Sprintf("failed to inspect compile exec: %v", err),
-			Done:  true,
-		}
-		return
-	}
-
-	if compileResult.ExitCode != 0 {
-		session.outputChan <- ProgramOutput{
-			Error:           compileStderr.String(),
-			Done:            true,
-			WaitingForInput: false,
-		}
-		return
-	}
-
-	execConfig := container.ExecOptions{
-		Cmd:          []string{"go", "run", "/code/main.go"},
-		WorkingDir:   "/code",
-		AttachStdin:  true,
-		AttachStdout: true,
-		AttachStderr: true,
-		Tty:          false,
-	}
-
-	execResp, err := localClient.ContainerExecCreate(ctx, containerID, execConfig)
-	if err != nil {
-		session.outputChan <- ProgramOutput{
-			Error: fmt.Sprintf("failed to create exec: %v", err),
-			Done:  true,
-		}
-		return
-	}
-
-	response, err := localClient.ContainerExecAttach(ctx, execResp.ID, container.ExecStartOptions{})
-	if err != nil {
-		session.outputChan <- ProgramOutput{
-			Error: fmt.Sprintf("failed to attach to exec: %v", err),
-			Done:  true,
-		}
-		return
-	}
-	defer response.Close()
-
-	reader := bufio.NewReader(response.Reader)
-	outputDone := make(chan struct{})
-
-	// Add a channel to track the program's running state
-	execDone := make(chan struct{})
-
-	// Start a goroutine to monitor the program's execution state
-	go func() {
-		defer close(execDone)
-		for {
-			inspect, err := localClient.ContainerExecInspect(ctx, execResp.ID)
-			if err != nil {
-				return
-			}
-			if !inspect.Running {
-				return
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
-	}()
-
-	// Handle program output and errors
-	go func() {
-		defer close(outputDone)
-
-		for {
-			header := make([]byte, 8)
-			_, err := reader.Read(header)
-			if err != nil {
-				if err != io.EOF {
-					session.outputChan <- ProgramOutput{
-						Error:           fmt.Sprintf("error reading output: %v", err),
-						Done:            true,
-						WaitingForInput: false,
-					}
-				} else {
-					// Send final output with Done: true on EOF
-					session.outputChan <- ProgramOutput{
-						Done:            true,
-						WaitingForInput: false,
-					}
-				}
-				return
-			}
-
-			streamType := header[0]
-			size := int64(binary.BigEndian.Uint32(header[4:]))
-
-			content := make([]byte, size)
-			_, err = io.ReadFull(reader, content)
-			if err != nil {
-				session.outputChan <- ProgramOutput{
-					Error:           fmt.Sprintf("error reading content: %v", err),
-					Done:            true,
-					WaitingForInput: false,
-				}
-				return
-			}
-
-			outputStr := string(content)
-
-			// Check if the output suggests waiting for input
-			/* 	isWaitingForInput := false
-			select {
-			case <-execDone:
-				// Program has finished executing
-				isWaitingForInput = false
-			default:
-				// Program is still running - check if it's likely waiting for input
-				isWaitingForInput = isInputPrompt(outputStr)
-			} */
-			isInput := isWaitingForInput(outputStr, session.detectedInputOps)
-
-			var output ProgramOutput
-			if streamType == 2 { // stderr
-				output = ProgramOutput{
-					Error:           outputStr,
-					WaitingForInput: false,
-				}
-			} else { // stdout
-				output = ProgramOutput{
-					Output:          outputStr,
-					WaitingForInput: isInput,
-				}
-			}
-
-			select {
-			case <-session.done:
-				return
-			case session.outputChan <- output:
-			}
-		}
-	}()
-
-	// Handle program input
-	for {
-		select {
-		case input, ok := <-session.inputChan:
-			if !ok {
-				return
-			}
-			fmt.Fprintln(response.Conn, input)
-		case <-session.done:
-			return
-		case <-outputDone:
-			return
-		case <-execDone:
-			return
-		}
-	}
 }
 
 func handleProgramOutput(w http.ResponseWriter, r *http.Request) {
@@ -832,4 +532,278 @@ func isWaitingForInput(output string, detectedOps []InputOperation) bool {
 	}
 
 	return false
+}
+
+func handleRun(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	defer func() {
+		log.Printf("Total request handling took: %v\n", time.Since(start))
+	}()
+
+	ip := r.RemoteAddr
+	if forwardedFor := r.Header.Get("X-Forwarded-For"); forwardedFor != "" {
+		ip = strings.Split(forwardedFor, ",")[0]
+	}
+
+	// Apply rate limiting
+	limiter := rateLimiter.getLimiter(ip)
+	if !limiter.Allow() {
+		http.Error(w, "Rate limit exceeded. Please try again later.", http.StatusTooManyRequests)
+		return
+	}
+
+	var requestData struct {
+		Code string `json:"code"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
+		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
+		return
+	}
+	if oldSessionIDStr := r.Header.Get("X-Previous-Session"); oldSessionIDStr != "" {
+		if oldSessionID, err := strconv.ParseUint(oldSessionIDStr, 10, 64); err == nil {
+			if oldSession, ok := activeSessions.Load(oldSessionID); ok {
+				oldSession.(*ProgramSession).Close()
+				activeSessions.Delete(oldSessionID)
+			}
+		}
+	}
+	sessionID := atomic.AddUint64(&sessionCounter, 1)
+	session := newSession()
+
+	activeSessions.Store(sessionID, session)
+
+	go func() {
+		defer session.Close()
+		defer activeSessions.Delete(sessionID)
+		runCode(requestData.Code, session)
+
+	}()
+
+	json.NewEncoder(w).Encode(map[string]uint64{"sessionId": sessionID})
+}
+
+func runCode(code string, session *ProgramSession) {
+	start := time.Now()
+	defer func() {
+		log.Printf("Code execution took: %v\n", time.Since(start))
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	inputOps, err := detectInputOperations(code)
+	if err != nil {
+		session.outputChan <- ProgramOutput{
+			Error: fmt.Sprintf("Failed to analyze code for input operations: %v", err),
+			Done:  true,
+		}
+		return
+	}
+	session.detectedInputOps = inputOps
+
+	if !validateGoCode(code) {
+		session.outputChan <- ProgramOutput{
+			Error: "invalid or potentially unsafe Go code",
+			Done:  true,
+		}
+		return
+	}
+
+	tempDir, err := os.MkdirTemp("", "goplayground")
+	if err != nil {
+		session.outputChan <- ProgramOutput{
+			Error: err.Error(),
+			Done:  true,
+		}
+		return
+	}
+	defer os.RemoveAll(tempDir)
+
+	tempFile := filepath.Join(tempDir, "main.go")
+	if err := os.WriteFile(tempFile, []byte(code), 0600); err != nil {
+		session.outputChan <- ProgramOutput{
+			Error: err.Error(),
+			Done:  true,
+		}
+		return
+	}
+
+	tar := createTarFromFile(tempFile)
+	if err := localClient.CopyToContainer(ctx, containerID, "/code", tar, container.CopyToContainerOptions{}); err != nil {
+		session.outputChan <- ProgramOutput{
+			Error: fmt.Sprintf("failed to copy code to container: %v", err),
+			Done:  true,
+		}
+		return
+	}
+
+	// First, try to compile the code
+	compileConfig := container.ExecOptions{
+		Cmd:          []string{"go", "build", "-o", "/dev/null", "/code/main.go"},
+		WorkingDir:   "/code",
+		AttachStdout: true,
+		AttachStderr: true,
+	}
+
+	compileResp, err := localClient.ContainerExecCreate(ctx, containerID, compileConfig)
+	if err != nil {
+		session.outputChan <- ProgramOutput{
+			Error: fmt.Sprintf("failed to create compile exec: %v", err),
+			Done:  true,
+		}
+		return
+	}
+
+	compileAttach, err := localClient.ContainerExecAttach(ctx, compileResp.ID, container.ExecStartOptions{})
+	if err != nil {
+		session.outputChan <- ProgramOutput{
+			Error: fmt.Sprintf("failed to attach to compile exec: %v", err),
+			Done:  true,
+		}
+		return
+	}
+	defer compileAttach.Close()
+
+	var compileStdout, compileStderr bytes.Buffer
+	if _, err := stdcopy.StdCopy(&compileStdout, &compileStderr, compileAttach.Reader); err != nil {
+		session.outputChan <- ProgramOutput{
+			Error: fmt.Sprintf("failed to read compile output: %v", err),
+			Done:  true,
+		}
+		return
+	}
+
+	compileResult, err := localClient.ContainerExecInspect(ctx, compileResp.ID)
+	if err != nil {
+		session.outputChan <- ProgramOutput{
+			Error: fmt.Sprintf("failed to inspect compile exec: %v", err),
+			Done:  true,
+		}
+		return
+	}
+
+	if compileResult.ExitCode != 0 {
+		session.outputChan <- ProgramOutput{
+			Error:           compileStderr.String(),
+			Done:            true,
+			WaitingForInput: false,
+		}
+		return
+	}
+
+	execConfig := container.ExecOptions{
+		Cmd:          []string{"go", "run", "/code/main.go"},
+		WorkingDir:   "/code",
+		AttachStdin:  true,
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          false,
+	}
+
+	execResp, err := localClient.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		session.outputChan <- ProgramOutput{
+			Error: fmt.Sprintf("failed to create exec: %v", err),
+			Done:  true,
+		}
+		return
+	}
+
+	response, err := localClient.ContainerExecAttach(ctx, execResp.ID, container.ExecStartOptions{})
+	if err != nil {
+		session.outputChan <- ProgramOutput{
+			Error: fmt.Sprintf("failed to attach to exec: %v", err),
+			Done:  true,
+		}
+		return
+	}
+	defer response.Close()
+
+	reader := bufio.NewReader(response.Reader)
+	outputDone := make(chan struct{})
+
+	// Add a channel to track the program's running state
+	execDone := make(chan struct{})
+
+	// Handle program output and errors
+	go func() {
+		defer close(outputDone)
+		defer close(session.outputChan)
+
+		for {
+			header := make([]byte, 8)
+			_, err := reader.Read(header)
+			if err != nil {
+				if err != io.EOF {
+					session.outputChan <- ProgramOutput{
+						Error:           fmt.Sprintf("error reading output: %v", err),
+						Done:            true,
+						WaitingForInput: false,
+					}
+				} else {
+					// Send final output with Done: true on EOF
+					session.outputChan <- ProgramOutput{
+						Done:            true,
+						WaitingForInput: false,
+					}
+				}
+				return
+			}
+
+			streamType := header[0]
+			size := int64(binary.BigEndian.Uint32(header[4:]))
+
+			content := make([]byte, size)
+			_, err = io.ReadFull(reader, content)
+			if err != nil {
+				session.outputChan <- ProgramOutput{
+					Error:           fmt.Sprintf("error reading content: %v", err),
+					Done:            true,
+					WaitingForInput: false,
+				}
+				return
+			}
+
+			outputStr := string(content)
+			isInput := isWaitingForInput(outputStr, session.detectedInputOps)
+
+			var output ProgramOutput
+			if streamType == 2 { // stderr
+				output = ProgramOutput{
+					Error:           outputStr,
+					WaitingForInput: false,
+				}
+			} else { // stdout
+				output = ProgramOutput{
+					Output:          outputStr,
+					WaitingForInput: isInput,
+				}
+			}
+
+			select {
+			case <-session.done:
+				return
+			case session.outputChan <- output:
+			}
+		}
+
+	}()
+
+	// Handle program input
+	for {
+		select {
+		case input, ok := <-session.inputChan:
+			if !ok {
+				return
+			}
+			fmt.Fprintln(response.Conn, input)
+		case <-session.done:
+			return
+		case <-outputDone:
+			return
+		case <-execDone:
+			return
+		}
+	}
 }
