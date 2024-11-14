@@ -291,7 +291,7 @@ async function runCode() {
         outputDiv.classList.remove("invalid");
         outputDiv.classList.add("success");
         cleanupSession(eventSource, inputHandler, inputSection);
-        outputDiv.innerHTML += `<div class="output-line finished-program">Program finished !</div>`;
+        outputDiv.innerHTML += `<div class="output-line finished-program">Program exited.</div>`;
       }
     };
 
