@@ -81,10 +81,11 @@ function saveCode() {
     })
     .catch((error) => {
       let output = document.getElementById("output");
+      output.innerHTML = "";
       output.classList.remove("success");
       output.classList.add("error");
       console.error("Fetch error:", error);
-      output.textContent = "Error: " + error;
+      output.innerHTML += `<div class="error">Error: ${error}</div>`;
     });
 }
 
