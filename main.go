@@ -8,7 +8,10 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"go/ast"
 	"go/format"
+	"go/parser"
+	"go/token"
 	"html/template"
 	"io"
 	"log"
@@ -109,10 +112,17 @@ type InputRequest struct {
 }
 
 type ProgramSession struct {
-	inputChan  chan string
-	outputChan chan ProgramOutput
-	done       chan struct{}
-	cleanup    sync.Once
+	inputChan        chan string
+	outputChan       chan ProgramOutput
+	done             chan struct{}
+	cleanup          sync.Once
+	detectedInputOps []InputOperation
+}
+
+type InputOperation struct {
+	Line    int
+	Type    string // Type of input operation (e.g., "fmt.Scan", "bufio.Scanner", etc.)
+	Package string
 }
 
 func newSession() *ProgramSession {
@@ -281,6 +291,16 @@ func runCode(code string, session *ProgramSession) {
 	defer close(session.outputChan)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+
+	inputOps, err := detectInputOperations(code)
+	if err != nil {
+		session.outputChan <- ProgramOutput{
+			Error: fmt.Sprintf("Failed to analyze code for input operations: %v", err),
+			Done:  true,
+		}
+		return
+	}
+	session.detectedInputOps = inputOps
 
 	if !validateGoCode(code) {
 		session.outputChan <- ProgramOutput{
@@ -471,7 +491,8 @@ func runCode(code string, session *ProgramSession) {
 				// Program is still running - check if it's likely waiting for input
 				isWaitingForInput = isInputPrompt(outputStr)
 			} */
-			isInput := isInputPrompt(outputStr)
+			isInput := isWaitingForInput(outputStr, session.detectedInputOps)
+
 			var output ProgramOutput
 			if streamType == 2 { // stderr
 				output = ProgramOutput{
@@ -509,41 +530,6 @@ func runCode(code string, session *ProgramSession) {
 			return
 		}
 	}
-}
-
-// isInputPrompt checks if the output string likely indicates waiting for input
-func isInputPrompt(output string) bool {
-	// Common input prompt patterns
-	inputPatterns := []string{
-		"Input:",
-		"Enter",
-		"Please enter",
-		"Type",
-		"?",
-		">",
-		":",
-	}
-
-	// Trim spaces and newlines
-	output = strings.TrimSpace(output)
-
-	// If the output is empty, it's probably not waiting for input
-	if output == "" {
-		return false
-	}
-
-	// Check if the output ends with common input prompt patterns
-	for _, pattern := range inputPatterns {
-		if strings.HasSuffix(output, pattern) {
-			return true
-		}
-	}
-	return false
-
-	// Check if the last character is a non-newline character
-	// This helps detect custom prompts
-	/* lastChar := output[len(output)-1]
-	return lastChar != '\n' && lastChar != '\r' */
 }
 
 func handleProgramOutput(w http.ResponseWriter, r *http.Request) {
@@ -770,4 +756,80 @@ func cacheControlWrapper(h http.Handler) http.Handler {
 		w.Header().Set("Cache-Control", "max-age=2592000") // 30 days
 		h.ServeHTTP(w, r)
 	})
+}
+
+func detectInputOperations(code string) ([]InputOperation, error) {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "main.go", code, parser.AllErrors)
+	if err != nil {
+		return nil, err
+	}
+
+	var operations []InputOperation
+
+	inputFuncs := map[string][]string{
+		"fmt": {
+			"Scan", "Scanf", "Scanln",
+			"Fscan", "Fscanf", "Fscanln",
+			"Sscan", "Sscanf", "Sscanln",
+		},
+		"bufio": {
+			"NewScanner",
+		},
+		"os": {
+			"Stdin",
+		},
+	}
+
+	ast.Inspect(file, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.CallExpr:
+			if sel, ok := x.Fun.(*ast.SelectorExpr); ok {
+				if pkg, ok := sel.X.(*ast.Ident); ok {
+					// Check if it's a known input function
+					if funcs, exists := inputFuncs[pkg.Name]; exists {
+						for _, funcName := range funcs {
+							if sel.Sel.Name == funcName {
+								operations = append(operations, InputOperation{
+									Line:    fset.Position(x.Pos()).Line,
+									Type:    pkg.Name + "." + sel.Sel.Name,
+									Package: pkg.Name,
+								})
+							}
+						}
+					}
+				}
+			}
+		case *ast.ImportSpec:
+			return true
+		}
+		return true
+	})
+
+	return operations, nil
+}
+
+func isWaitingForInput(output string, detectedOps []InputOperation) bool {
+	if len(detectedOps) > 0 {
+		inputPatterns := []string{
+			"input", "enter", "type", "?", ">", ":",
+		}
+
+		outputLower := strings.ToLower(strings.TrimSpace(output))
+
+		for _, pattern := range inputPatterns {
+			if strings.HasSuffix(outputLower, pattern) {
+				return true
+			}
+		}
+
+		if len(output) > 0 {
+			lastChar := output[len(output)-1]
+			if lastChar != '\n' && lastChar != '\r' {
+				return true
+			}
+		}
+	}
+
+	return false
 }
