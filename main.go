@@ -202,14 +202,14 @@ func handleRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if oldSessionIDStr := r.Header.Get("X-Previous-Session"); oldSessionIDStr != "" {
+	/* if oldSessionIDStr := r.Header.Get("X-Previous-Session"); oldSessionIDStr != "" {
 		if oldSessionID, err := strconv.ParseUint(oldSessionIDStr, 10, 64); err == nil {
 			if oldSession, ok := activeSessions.Load(oldSessionID); ok {
 				oldSession.(*ProgramSession).Close()
 				activeSessions.Delete(oldSessionID)
 			}
 		}
-	}
+	} */
 
 	var requestData struct {
 		Code string `json:"code"`

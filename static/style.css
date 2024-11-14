@@ -162,7 +162,6 @@ div#output.invalid::before {
 
 .error {
   color: #cc0000;
-  margin: 0.25rem 0;
   font-family: monospace;
 }
 
