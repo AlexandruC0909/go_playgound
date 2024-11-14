@@ -309,7 +309,7 @@ func (l *Life) String() string {
 }
 
 func main() {
-	l := NewLife(40, 15)
+	l := NewLife(80, 15)
 	for i := 0; i < 300; i++ {
 		l.Step()
 		fmt.Print("", l) // Clear screen and print field.
