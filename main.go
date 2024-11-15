@@ -535,26 +535,12 @@ func isWaitingForInput(output string, detectedOps []InputOperation) bool {
 	return false
 }
 
-// Types and interfaces to improve structure
-type ExecutionResult struct {
-	Error           string
-	Output          string
-	Done            bool
-	WaitingForInput bool
-}
-
-type CodeExecutor interface {
-	Compile(ctx context.Context, code string) error
-	Run(ctx context.Context, session *ProgramSession) error
-}
-
 type DockerExecutor struct {
 	client      *client.Client
 	containerID string
 	workDir     string
 }
 
-// NewDockerExecutor creates a new DockerExecutor instance
 func NewDockerExecutor(client *client.Client, containerID string) *DockerExecutor {
 	return &DockerExecutor{
 		client:      client,
@@ -724,12 +710,9 @@ func (e *DockerExecutor) processInput(response types.HijackedResponse, session *
 }
 
 func handleRun(w http.ResponseWriter, r *http.Request) {
-
 	start := time.Now()
-
 	defer logTiming("Total request handling", start)
 
-	// Extract request handling to separate function
 	sessionID, err := handleRequest(w, r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -767,7 +750,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) (uint64, error) {
 func executeCode(code string, session *ProgramSession, sessionID uint64) {
 	start := time.Now()
 
-	defer logTiming("Code execution took:", start)
+	defer logTiming("Code execution", start)
 	defer func() {
 		session.Close()
 		activeSessions.Delete(sessionID)
