@@ -25,6 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/AlexandruC0909/playground/internal/models"
 	"github.com/AlexandruC0909/playground/templates"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -101,44 +102,12 @@ func (rl *RateLimiter) getLimiter(ip string) *rate.Limiter {
 	return limiter
 }
 
-type ProgramOutput struct {
-	Output          string `json:"output,omitempty"`
-	Error           string `json:"error,omitempty"`
-	WaitingForInput bool   `json:"waitingForInput"`
-	Done            bool   `json:"done"`
-}
-
-type InputRequest struct {
-	Input string `json:"input"`
-}
-
-type ProgramSession struct {
-	inputChan        chan string
-	outputChan       chan ProgramOutput
-	done             chan struct{}
-	cleanup          sync.Once
-	detectedInputOps []InputOperation
-}
-
-type InputOperation struct {
-	Line    int
-	Type    string // Type of input operation (e.g., "fmt.Scan", "bufio.Scanner", etc.)
-	Package string
-}
-
-func newSession() *ProgramSession {
-	return &ProgramSession{
-		inputChan:  make(chan string),
-		outputChan: make(chan ProgramOutput),
-		done:       make(chan struct{}),
+func newSession() *models.ProgramSession {
+	return &models.ProgramSession{
+		InputChan:  make(chan string),
+		OutputChan: make(chan models.ProgramOutput),
+		Done:       make(chan struct{}),
 	}
-}
-
-func (s *ProgramSession) Close() {
-	s.cleanup.Do(func() {
-		close(s.done)
-		close(s.inputChan)
-	})
 }
 
 func main() {
@@ -167,7 +136,7 @@ func main() {
 	http.HandleFunc("/send-input", handleSendInput)
 
 	workDir, _ := os.Getwd()
-	filesDir := http.Dir(filepath.Join(workDir, "/static"))
+	filesDir := http.Dir(filepath.Join(workDir, "../../static"))
 	http.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(filesDir)))
 
 	log.Fatal(http.ListenAndServe(":8088", nil))
@@ -245,7 +214,7 @@ func handleProgramOutput(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Session not found", http.StatusNotFound)
 		return
 	}
-	session := sessionInterface.(*ProgramSession)
+	session := sessionInterface.(*models.ProgramSession)
 
 	// Set headers for SSE
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -265,7 +234,7 @@ func handleProgramOutput(w http.ResponseWriter, r *http.Request) {
 
 	for {
 		select {
-		case output, ok := <-session.outputChan:
+		case output, ok := <-session.OutputChan:
 			if !ok {
 				return
 			}
@@ -278,7 +247,7 @@ func handleProgramOutput(w http.ResponseWriter, r *http.Request) {
 			}
 		case <-done:
 			return
-		case <-session.done:
+		case <-session.Done:
 			return
 		}
 	}
@@ -296,18 +265,18 @@ func handleSendInput(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Session not found", http.StatusNotFound)
 		return
 	}
-	session := sessionInterface.(*ProgramSession)
+	session := sessionInterface.(*models.ProgramSession)
 
-	var inputReq InputRequest
+	var inputReq models.InputRequest
 	if err := json.NewDecoder(r.Body).Decode(&inputReq); err != nil {
 		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
 		return
 	}
 
 	select {
-	case session.inputChan <- inputReq.Input:
+	case session.InputChan <- inputReq.Input:
 		w.WriteHeader(http.StatusOK)
-	case <-session.done:
+	case <-session.Done:
 		http.Error(w, "Program execution completed", http.StatusGone)
 	case <-time.After(5 * time.Second):
 		http.Error(w, "Timeout waiting for program to accept input", http.StatusRequestTimeout)
@@ -459,14 +428,14 @@ func cacheControlWrapper(h http.Handler) http.Handler {
 	})
 }
 
-func detectInputOperations(code string) ([]InputOperation, error) {
+func detectInputOperations(code string) ([]models.InputOperation, error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "main.go", code, parser.AllErrors)
 	if err != nil {
 		return nil, err
 	}
 
-	var operations []InputOperation
+	var operations []models.InputOperation
 
 	inputFuncs := map[string][]string{
 		"fmt": {
@@ -491,7 +460,7 @@ func detectInputOperations(code string) ([]InputOperation, error) {
 					if funcs, exists := inputFuncs[pkg.Name]; exists {
 						for _, funcName := range funcs {
 							if sel.Sel.Name == funcName {
-								operations = append(operations, InputOperation{
+								operations = append(operations, models.InputOperation{
 									Line:    fset.Position(x.Pos()).Line,
 									Type:    pkg.Name + "." + sel.Sel.Name,
 									Package: pkg.Name,
@@ -510,7 +479,7 @@ func detectInputOperations(code string) ([]InputOperation, error) {
 	return operations, nil
 }
 
-func isWaitingForInput(output string, detectedOps []InputOperation) bool {
+func isWaitingForInput(output string, detectedOps []models.InputOperation) bool {
 	if len(detectedOps) > 0 {
 		inputPatterns := []string{
 			"input", "enter", "type", "?", ">", ":",
@@ -566,7 +535,7 @@ func (e *DockerExecutor) Compile(ctx context.Context, code string) error {
 		return fmt.Errorf("failed to copy code to container: %v", err)
 	}
 
-	execConfig := types.ExecConfig{
+	execConfig := container.ExecOptions{
 		Cmd:          []string{"go", "build", "-o", "/dev/null", filepath.Join(e.workDir, "main.go")},
 		WorkingDir:   e.workDir,
 		AttachStdout: true,
@@ -601,7 +570,7 @@ func (e *DockerExecutor) Compile(ctx context.Context, code string) error {
 	return nil
 }
 
-func (e *DockerExecutor) Run(ctx context.Context, session *ProgramSession) error {
+func (e *DockerExecutor) Run(ctx context.Context, session *models.ProgramSession) error {
 	execConfig := container.ExecOptions{
 		Cmd:          []string{"go", "run", filepath.Join(e.workDir, "main.go")},
 		WorkingDir:   e.workDir,
@@ -625,7 +594,7 @@ func (e *DockerExecutor) Run(ctx context.Context, session *ProgramSession) error
 	return e.handleExecIO(ctx, response, session)
 }
 
-func (e *DockerExecutor) handleExecIO(ctx context.Context, response types.HijackedResponse, session *ProgramSession) error {
+func (e *DockerExecutor) handleExecIO(ctx context.Context, response types.HijackedResponse, session *models.ProgramSession) error {
 	reader := bufio.NewReader(response.Reader)
 	outputDone := make(chan struct{})
 
@@ -634,22 +603,22 @@ func (e *DockerExecutor) handleExecIO(ctx context.Context, response types.Hijack
 	return e.processInput(response, session, outputDone)
 }
 
-func (e *DockerExecutor) processOutput(reader *bufio.Reader, session *ProgramSession, outputDone chan struct{}) {
+func (e *DockerExecutor) processOutput(reader *bufio.Reader, session *models.ProgramSession, outputDone chan struct{}) {
 	defer close(outputDone)
-	defer close(session.outputChan)
+	defer close(session.OutputChan)
 
 	for {
 		header := make([]byte, 8)
 		_, err := reader.Read(header)
 		if err != nil {
 			if err != io.EOF {
-				session.outputChan <- ProgramOutput{
+				session.OutputChan <- models.ProgramOutput{
 					Error:           fmt.Sprintf("error reading output: %v", err),
 					Done:            true,
 					WaitingForInput: false,
 				}
 			} else {
-				session.outputChan <- ProgramOutput{
+				session.OutputChan <- models.ProgramOutput{
 					Done:            true,
 					WaitingForInput: false,
 				}
@@ -662,7 +631,7 @@ func (e *DockerExecutor) processOutput(reader *bufio.Reader, session *ProgramSes
 
 		content := make([]byte, size)
 		if _, err = io.ReadFull(reader, content); err != nil {
-			session.outputChan <- ProgramOutput{
+			session.OutputChan <- models.ProgramOutput{
 				Error:           fmt.Sprintf("error reading content: %v", err),
 				Done:            true,
 				WaitingForInput: false,
@@ -671,9 +640,9 @@ func (e *DockerExecutor) processOutput(reader *bufio.Reader, session *ProgramSes
 		}
 
 		outputStr := string(content)
-		isInput := isWaitingForInput(outputStr, session.detectedInputOps)
+		isInput := isWaitingForInput(outputStr, session.DetectedInputOps)
 
-		output := ProgramOutput{
+		output := models.ProgramOutput{
 			Output:          outputStr,
 			WaitingForInput: isInput,
 		}
@@ -684,24 +653,24 @@ func (e *DockerExecutor) processOutput(reader *bufio.Reader, session *ProgramSes
 		}
 
 		select {
-		case <-session.done:
+		case <-session.Done:
 			return
-		case session.outputChan <- output:
+		case session.OutputChan <- output:
 		}
 	}
 }
 
-func (e *DockerExecutor) processInput(response types.HijackedResponse, session *ProgramSession, outputDone chan struct{}) error {
+func (e *DockerExecutor) processInput(response types.HijackedResponse, session *models.ProgramSession, outputDone chan struct{}) error {
 	for {
 		select {
-		case input, ok := <-session.inputChan:
+		case input, ok := <-session.InputChan:
 			if !ok {
 				return nil
 			}
 			if _, err := fmt.Fprintln(response.Conn, input); err != nil {
 				return fmt.Errorf("failed to write input: %v", err)
 			}
-		case <-session.done:
+		case <-session.Done:
 			return nil
 		case <-outputDone:
 			return nil
@@ -747,7 +716,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) (uint64, error) {
 	return sessionID, nil
 }
 
-func executeCode(code string, session *ProgramSession, sessionID uint64) {
+func executeCode(code string, session *models.ProgramSession, sessionID uint64) {
 	start := time.Now()
 
 	defer logTiming("Code execution", start)
@@ -813,19 +782,19 @@ func cleanupPreviousSession(r *http.Request) {
 	if oldSessionIDStr := r.Header.Get("X-Previous-Session"); oldSessionIDStr != "" {
 		if oldSessionID, err := strconv.ParseUint(oldSessionIDStr, 10, 64); err == nil {
 			if oldSession, ok := activeSessions.Load(oldSessionID); ok {
-				oldSession.(*ProgramSession).Close()
+				oldSession.(*models.ProgramSession).Close()
 				activeSessions.Delete(oldSessionID)
 			}
 		}
 	}
 }
 
-func validateAndPrepare(code string, session *ProgramSession) error {
+func validateAndPrepare(code string, session *models.ProgramSession) error {
 	inputOps, err := detectInputOperations(code)
 	if err != nil {
 		return fmt.Errorf("failed to analyze code for input operations: %v", err)
 	}
-	session.detectedInputOps = inputOps
+	session.DetectedInputOps = inputOps
 
 	if !validateGoCode(code) {
 		return fmt.Errorf("invalid or potentially unsafe Go code")
@@ -837,8 +806,8 @@ func logTiming(operation string, start time.Time) {
 	log.Printf("%s took: %v\n", operation, time.Since(start))
 }
 
-func sendError(session *ProgramSession, errMsg string) {
-	session.outputChan <- ProgramOutput{
+func sendError(session *models.ProgramSession, errMsg string) {
+	session.OutputChan <- models.ProgramOutput{
 		Error: errMsg,
 		Done:  true,
 	}
