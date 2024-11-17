@@ -1,5 +1,4 @@
 name: Go
-
 on:
   push:
     branches: ["main"]
@@ -11,24 +10,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
+      
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.21.6'
-
+          
       - name: Build
-        run: go build -o main .
-
+        run: go build -o main ./cmd/server  
+        
       - name: Use SSH key for deployment
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
+          
       - name: Debug Loaded SSH Keys
         run: |
           ssh-add -l
-
+          
       - name: Copy program to server
         run: |
           scp -o StrictHostKeyChecking=no ./main $SERVER_USERNAME@$SERVER_IP:/usr/local/playground
