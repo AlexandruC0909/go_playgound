@@ -4,18 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"go/ast"
 	"go/format"
-	"go/parser"
-	"go/token"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -23,13 +18,13 @@ import (
 	"github.com/AlexandruC0909/playground/internal/config"
 	"github.com/AlexandruC0909/playground/internal/docker"
 	"github.com/AlexandruC0909/playground/internal/models"
+	"github.com/AlexandruC0909/playground/internal/utils"
 	"github.com/AlexandruC0909/playground/templates"
 	"github.com/docker/docker/client"
-	"golang.org/x/time/rate"
 )
 
 var (
-	rateLimiter    = NewRateLimiter()
+	rateLimiter    = utils.NewRateLimiter()
 	containerID    string
 	localClient    *client.Client
 	container      *docker.Container
@@ -38,34 +33,9 @@ var (
 	sessionCounter uint64
 )
 
-type RateLimiter struct {
-	visitors map[string]*rate.Limiter
-	mu       sync.Mutex
-}
-
-func NewRateLimiter() *RateLimiter {
-	return &RateLimiter{
-		visitors: make(map[string]*rate.Limiter),
-	}
-}
-
-func (rl *RateLimiter) getLimiter(ip string) *rate.Limiter {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-
-	limiter, exists := rl.visitors[ip]
-	if !exists {
-		// Create both per-minute and per-hour limiters
-		limiter = rate.NewLimiter(rate.Every(time.Minute/time.Duration(config.RequestsPerMinute)), 1)
-		rl.visitors[ip] = limiter
-	}
-
-	return limiter
-}
-
 func main() {
 	log.Println("Starting Go Playground...")
-
+	var err error
 	containerConfig := docker.ContainerConfig{
 		Name:        config.ContainerName,
 		Image:       config.DockerImage,
@@ -73,7 +43,7 @@ func main() {
 		WorkDir:     "/code",
 	}
 
-	container, err := docker.NewContainer(containerConfig)
+	container, err = docker.NewContainer(containerConfig)
 	if err != nil {
 		log.Fatalf("Failed to create Docker container: %v", err)
 	}
@@ -241,29 +211,6 @@ func handleSendInput(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func validateGoCode(code string) bool {
-	for _, pattern := range config.DisallowedPatterns {
-		match, _ := regexp.MatchString(pattern, code)
-		if match {
-			return false
-		}
-	}
-
-	if strings.Count(code, "func") > 50 {
-		return false // Prevent too many functions
-	}
-
-	if strings.Count(code, "for") > 30 {
-		return false // Limit number of loops
-	}
-	/*
-		if strings.Count(code, "go ") > 0 {
-			return false // Prevent goroutines
-		} */
-
-	return true
-}
-
 func cacheControlWrapper(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "max-age=2592000") // 30 days
@@ -271,62 +218,11 @@ func cacheControlWrapper(h http.Handler) http.Handler {
 	})
 }
 
-func detectInputOperations(code string) ([]models.InputOperation, error) {
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, "main.go", code, parser.AllErrors)
-	if err != nil {
-		return nil, err
-	}
-
-	var operations []models.InputOperation
-
-	inputFuncs := map[string][]string{
-		"fmt": {
-			"Scan", "Scanf", "Scanln",
-			"Fscan", "Fscanf", "Fscanln",
-			"Sscan", "Sscanf", "Sscanln",
-		},
-		"bufio": {
-			"NewScanner",
-		},
-		"os": {
-			"Stdin",
-		},
-	}
-
-	ast.Inspect(file, func(n ast.Node) bool {
-		switch x := n.(type) {
-		case *ast.CallExpr:
-			if sel, ok := x.Fun.(*ast.SelectorExpr); ok {
-				if pkg, ok := sel.X.(*ast.Ident); ok {
-					// Check if it's a known input function
-					if funcs, exists := inputFuncs[pkg.Name]; exists {
-						for _, funcName := range funcs {
-							if sel.Sel.Name == funcName {
-								operations = append(operations, models.InputOperation{
-									Line:    fset.Position(x.Pos()).Line,
-									Type:    pkg.Name + "." + sel.Sel.Name,
-									Package: pkg.Name,
-								})
-							}
-						}
-					}
-				}
-			}
-		case *ast.ImportSpec:
-			return true
-		}
-		return true
-	})
-
-	return operations, nil
-}
-
 func handleRun(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	defer logTiming("Total request handling", start)
+	defer utils.LogTiming("Total request handling", start)
 
-	sessionID, err := handleRequest(w, r)
+	sessionID, err := handleRequest(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -336,19 +232,19 @@ func handleRun(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func handleRequest(w http.ResponseWriter, r *http.Request) (uint64, error) {
-	ip := extractIP(r)
+func handleRequest(r *http.Request) (uint64, error) {
+	ip := utils.ExtractIP(r)
 
-	if err := checkRateLimit(ip); err != nil {
+	if err := utils.CheckRateLimit(rateLimiter, ip); err != nil {
 		return 0, err
 	}
 
-	requestData, err := parseRequestBody(r)
+	requestData, err := utils.ParseRequestBody(r)
 	if err != nil {
 		return 0, err
 	}
 
-	cleanupPreviousSession(r)
+	utils.CleanupPreviousSession(&activeSessions, r)
 
 	sessionID := atomic.AddUint64(&sessionCounter, 1)
 	session := models.NewSession()
@@ -363,7 +259,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) (uint64, error) {
 func executeCode(code string, session *models.ProgramSession, sessionID uint64) {
 	start := time.Now()
 
-	defer logTiming("Code execution", start)
+	defer utils.LogTiming("Code execution", start)
 	defer func() {
 		session.Close()
 		activeSessions.Delete(sessionID)
@@ -372,81 +268,18 @@ func executeCode(code string, session *models.ProgramSession, sessionID uint64) 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	if err := validateAndPrepare(code, session); err != nil {
-		sendError(session, err.Error())
+	if err := utils.ValidateAndPrepare(code, session); err != nil {
+		utils.SendError(session, err.Error())
 		return
 	}
 
 	if err := executor.Compile(ctx, code); err != nil {
-		sendError(session, err.Error())
+		utils.SendError(session, err.Error())
 		return
 	}
 
 	if err := executor.Run(ctx, session); err != nil {
-		sendError(session, err.Error())
+		utils.SendError(session, err.Error())
 		return
-	}
-}
-
-// Helper functions
-func extractIP(r *http.Request) string {
-	if forwardedFor := r.Header.Get("X-Forwarded-For"); forwardedFor != "" {
-		return strings.Split(forwardedFor, ",")[0]
-	}
-	return r.RemoteAddr
-}
-
-func checkRateLimit(ip string) error {
-	limiter := rateLimiter.getLimiter(ip)
-	if !limiter.Allow() {
-		return fmt.Errorf("rate limit exceeded")
-	}
-	return nil
-}
-
-func parseRequestBody(r *http.Request) (struct {
-	Code string `json:"code"`
-}, error) {
-	var requestData struct {
-		Code string `json:"code"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		return requestData, fmt.Errorf("error decoding JSON: %v", err)
-	}
-	return requestData, nil
-}
-
-func cleanupPreviousSession(r *http.Request) {
-	if oldSessionIDStr := r.Header.Get("X-Previous-Session"); oldSessionIDStr != "" {
-		if oldSessionID, err := strconv.ParseUint(oldSessionIDStr, 10, 64); err == nil {
-			if oldSession, ok := activeSessions.Load(oldSessionID); ok {
-				oldSession.(*models.ProgramSession).Close()
-				activeSessions.Delete(oldSessionID)
-			}
-		}
-	}
-}
-
-func validateAndPrepare(code string, session *models.ProgramSession) error {
-	inputOps, err := detectInputOperations(code)
-	if err != nil {
-		return fmt.Errorf("failed to analyze code for input operations: %v", err)
-	}
-	session.DetectedInputOps = inputOps
-
-	if !validateGoCode(code) {
-		return fmt.Errorf("invalid or potentially unsafe Go code")
-	}
-	return nil
-}
-
-func logTiming(operation string, start time.Time) {
-	log.Printf("%s took: %v\n", operation, time.Since(start))
-}
-
-func sendError(session *models.ProgramSession, errMsg string) {
-	session.OutputChan <- models.ProgramOutput{
-		Error: errMsg,
-		Done:  true,
 	}
 }
