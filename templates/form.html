@@ -7,14 +7,14 @@
     <title>Go Playground</title>
     <link rel="icon" type="image/x-icon" href="/static/icons/favicon.ico">
     <meta name="description" content="An online code editor for the Go programming language.">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style/style.css">
 
 </head>
 
 <body>
   <div class="header">
-    <h2>Go Playground</h2>
-    <div class="button-container">
+    <div class="title-container">  
+      <h2>Go Playground</h2>
       <div class="dropdown">
         <button class="button-example button-1">Examples</button>
         <div class="dropdown-content" role="menu">
@@ -28,9 +28,13 @@
           <div role="menuitem" onclick="selectMenuItem(7)">Conway's Game of Life</div>
           <div role="menuitem" onclick="selectMenuItem(8)">Progress bar</div>
         </div>
-      </div>
-      <button class="button-1 button-reset" onclick="selectMenuItem()">Reset</button>
-      <button class="button-1 button-run" onclick="runCode()">Run</button>
+      </div></div>
+  
+    <div class="button-container">
+     
+      <button id="button-reset" class="button-1 button-reset" onclick="selectMenuItem()">Reset</button>
+      <button class="button-1 button-reset" onclick="editorApp.saveCode()">{{"Format"}}<span class="shortcuts"> &nbsp;⌘+S</span></button>
+      <button class="button-1 button-run" onclick="editorApp.runCode()">{{"Run"}}<span class="shortcuts"> &nbsp;⌘+↵</span></button>
 
     </div>
     
@@ -63,7 +67,6 @@ func main() {
 <script src="/static/js/ace.js"></script>
 <script src="/static/js/theme-cobalt.js"></script>
 <script src="/static/js/mode-golang.js"></script>
-<script src="/static/script.js"></script>
-<script src="/static/resetCode.js"></script>
+<script src="/static/js/script.js"></script>
 
 </html>
