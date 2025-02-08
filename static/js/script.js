@@ -422,7 +422,7 @@ func fibonacci(n int) {
 }
 
 func main() {
-    n := 20
+    n := 15
     fibonacci(n)
 }`,
           -1
