@@ -3,20 +3,20 @@ const EDITOR_CONFIG = {
   theme: "ace/theme/cobalt",
   mode: "ace/mode/golang",
   enableAutoIndent: true,
-  showPrintMargin: false
+  showPrintMargin: false,
 };
 
 const KEYBINDINGS = {
   runCode: {
     name: "runCode",
     bindKey: { win: "Ctrl-Enter", mac: "Command-Enter" },
-    readOnly: true
+    readOnly: true,
   },
   saveCode: {
     name: "saveCode",
     bindKey: { win: "Ctrl-S", mac: "Command-S" },
-    readOnly: false
-  }
+    readOnly: false,
+  },
 };
 
 class EditorState {
@@ -64,7 +64,7 @@ class Editor {
   }
 
   setupCommands() {
-    Object.values(KEYBINDINGS).forEach(binding => {
+    Object.values(KEYBINDINGS).forEach((binding) => {
       this.editor.commands.addCommand({
         ...binding,
         exec: () => {
@@ -73,7 +73,7 @@ class Editor {
           } else if (binding.name === "saveCode") {
             this.saveCode();
           }
-        }
+        },
       });
     });
   }
@@ -81,18 +81,24 @@ class Editor {
   setupDropdownEvents() {
     const dropdown = document.querySelector(".dropdown");
     const dropdownContent = document.querySelector(".dropdown-content");
-    
-    dropdown.addEventListener("mouseenter", () => dropdownContent.style.display = "block");
-    dropdown.addEventListener("mouseleave", () => dropdownContent.style.display = "none");
+
+    dropdown.addEventListener(
+      "mouseenter",
+      () => (dropdownContent.style.display = "block")
+    );
+    dropdown.addEventListener(
+      "mouseleave",
+      () => (dropdownContent.style.display = "none")
+    );
   }
 
   // Column position helper
   findCorrespondingColumn(originalLine, formattedLine, originalColumn) {
     if (!originalLine || !formattedLine) return 0;
-  
+
     const originalPositions = new Map();
     const formattedPositions = new Map();
-  
+
     for (let i = 0; i < originalLine.length; i++) {
       const char = originalLine[i];
       if (!originalPositions.has(char)) {
@@ -100,7 +106,7 @@ class Editor {
       }
       originalPositions.get(char).push(i);
     }
-  
+
     for (let i = 0; i < formattedLine.length; i++) {
       const char = formattedLine[i];
       if (!formattedPositions.has(char)) {
@@ -108,10 +114,10 @@ class Editor {
       }
       formattedPositions.get(char).push(i);
     }
-  
+
     const targetChar = originalLine[originalColumn];
     if (!targetChar) return formattedLine.length;
-  
+
     const originalPositionsArray = originalPositions.get(targetChar) || [];
     let occurrenceIndex = 0;
     for (let i = 0; i < originalPositionsArray.length; i++) {
@@ -121,12 +127,12 @@ class Editor {
         break;
       }
     }
-  
+
     const formattedPositionsArray = formattedPositions.get(targetChar) || [];
     if (formattedPositionsArray.length > occurrenceIndex) {
       return formattedPositionsArray[occurrenceIndex];
     }
-  
+
     return formattedLine.length;
   }
 
@@ -135,13 +141,15 @@ class Editor {
     const code = this.editor.getValue();
     const cursorPosition = this.editor.getCursorPosition();
     const hasSelection = !this.editor.selection.isEmpty();
-    const selectionRange = hasSelection ? this.editor.selection.getRange() : null;
+    const selectionRange = hasSelection
+      ? this.editor.selection.getRange()
+      : null;
 
     try {
       const response = await fetch("/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code })
+        body: JSON.stringify({ code }),
       });
 
       const { code: formattedCode } = await response.json();
@@ -151,7 +159,7 @@ class Editor {
       const formattedLines = formattedCode.split("\n");
 
       this.editor.setValue(formattedCode, -1);
-      
+
       // Restore cursor position
       if (cursorPosition.row < formattedLines.length) {
         const formattedColumn = this.findCorrespondingColumn(
@@ -161,12 +169,12 @@ class Editor {
         );
         this.editor.moveCursorToPosition({
           row: cursorPosition.row,
-          column: formattedColumn
+          column: formattedColumn,
         });
       } else {
         this.editor.moveCursorToPosition({
           row: formattedLines.length - 1,
-          column: formattedLines[formattedLines.length - 1].length
+          column: formattedLines[formattedLines.length - 1].length,
         });
       }
 
@@ -176,7 +184,6 @@ class Editor {
       } else {
         this.editor.clearSelection();
       }
-
     } catch (error) {
       this.handleError(error);
     }
@@ -191,9 +198,9 @@ class Editor {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Previous-Session": this.state.currentSessionId || ""
+          "X-Previous-Session": this.state.currentSessionId || "",
         },
-        body: JSON.stringify({ code })
+        body: JSON.stringify({ code }),
       });
 
       if (!response.ok) {
@@ -203,14 +210,15 @@ class Editor {
       const { sessionId } = await response.json();
       this.state.currentSessionId = sessionId;
       this.setupEventSource(sessionId);
-
     } catch (error) {
       this.handleError(error);
     }
   }
 
   setupEventSource(sessionId) {
-    const eventSource = new EventSource(`/program-output?sessionId=${sessionId}`);
+    const eventSource = new EventSource(
+      `/program-output?sessionId=${sessionId}`
+    );
     this.state.currentEventSource = eventSource;
 
     eventSource.onmessage = async (event) => {
@@ -289,11 +297,14 @@ class Editor {
         this.outputDiv.innerHTML += `<div class="output-line">${inputValue}</div>`;
 
         try {
-          const response = await fetch(`/send-input?sessionId=${this.state.currentSessionId}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ input: inputValue })
-          });
+          const response = await fetch(
+            `/send-input?sessionId=${this.state.currentSessionId}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ input: inputValue }),
+            }
+          );
 
           if (!response.ok) {
             throw new Error(await response.text());
@@ -343,7 +354,8 @@ class Editor {
     this.inputSection.classList.add("display-none");
 
     if (this.state.currentInputHandler) {
-      document.getElementById("console-input")
+      document
+        .getElementById("console-input")
         .removeEventListener("keypress", this.state.currentInputHandler);
       this.state.currentInputHandler = null;
     }
@@ -361,7 +373,8 @@ class Editor {
     }
 
     if (this.state.currentInputHandler) {
-      document.getElementById("console-input")
+      document
+        .getElementById("console-input")
         .removeEventListener("keypress", this.state.currentInputHandler);
       this.state.currentInputHandler = null;
     }
@@ -371,48 +384,53 @@ class Editor {
   }
 
   resetCode(example) {
-    const output = document.getElementById("output")
-    output.classList.remove('error');
-    output.classList.remove('success');
-    output.classList.remove('invalid');
+    const output = document.getElementById("output");
+    output.classList.remove("error");
+    output.classList.remove("success");
+    output.classList.remove("invalid");
     output.textContent = "";
     switch (example) {
       case 1:
-      this.editor.setValue(`package main
+        this.editor.setValue(
+          `package main
   
   import "fmt"
   
   func main() {
       fmt.Println("Hello, World!")
-  }`, -1);
-      break
+  }`,
+          -1
+        );
+        break;
       case 2:
-      this.editor.setValue(
-  `package main
-  
-  import "fmt"
-  
-  func fibonacci(n int) int {
-      if n <= 1 {
-          return n
-      }
-      a, b := 0, 1
-      for i := 2; i <= n; i++ {
-          a, b = b, a+b
-      }
-      return b
-  }
-  
-  func main() {
-      n := 20
-      for i := 0; i <= n; i++ {
-          fmt.Printf("Fibonacci(%d) = %d\\n", i, fibonacci(i))
-      }
-  }`
-  , -1);
-      break
+        this.editor.setValue(
+          `package main
+
+import "fmt"
+
+func fibonacci(n int) {
+    a, b := 0, 1
+    fmt.Printf("Fibonacci(%d) = %d\n", 0, a)
+    if n == 0 {
+        return
+    }
+    fmt.Printf("Fibonacci(%d) = %d\n", 1, b)
+    for i := 2; i <= n; i++ {
+        a, b = b, a+b
+        fmt.Printf("Fibonacci(%d) = %d\n", i, b)
+    }
+}
+
+func main() {
+    n := 20
+    fibonacci(n)
+}`,
+          -1
+        );
+        break;
       case 3:
-      this.editor.setValue(`package main
+        this.editor.setValue(
+          `package main
   
   import (
       "fmt"
@@ -450,10 +468,13 @@ class Editor {
       bubbleSort(arr)
   
       fmt.Println("Sorted array:", arr)
-  }`, -1);
-      break
+  }`,
+          -1
+        );
+        break;
       case 4:
-      this.editor.setValue(`package main
+        this.editor.setValue(
+          `package main
   
   import (
       "fmt"
@@ -498,10 +519,13 @@ class Editor {
           fmt.Printf("Cube: %d\\n", cubeResult)
       }
   }
-  `, -1);
-      break
+  `,
+          -1
+        );
+        break;
       case 5:
-      this.editor.setValue(`package main
+        this.editor.setValue(
+          `package main
   
   import (
       "fmt"
@@ -544,10 +568,13 @@ class Editor {
       }
   }
   
-  `, -1);
-      break
+  `,
+          -1
+        );
+        break;
       case 6:
-      this.editor.setValue(`package main
+        this.editor.setValue(
+          `package main
   
   import (
       "bufio"
@@ -570,10 +597,13 @@ class Editor {
       fmt.Printf("Nice to meet you, %s! %s is a great color!\\n", 
           strings.TrimSpace(name), 
           strings.TrimSpace(color))
-  }`, -1);
-      break
+  }`,
+          -1
+        );
+        break;
       case 7:
-      this.editor.setValue(`// An implementation of Conway's Game of Life.
+        this.editor.setValue(
+          `// An implementation of Conway's Game of Life.
   package main
   
   import (
@@ -685,10 +715,13 @@ class Editor {
     fmt.Print("", l) // Clear screen and print field.
     time.Sleep(time.Second / 30)
   }
-  }`, -1);
-      break
+  }`,
+          -1
+        );
+        break;
       case 8:
-      this.editor.setValue(`package main
+        this.editor.setValue(
+          `package main
   
   import (
   "fmt"
@@ -706,10 +739,11 @@ class Editor {
   }
   fmt.Printf(bar+" Done!", strings.Repeat("=", col))
   }
-  `, -1);
-      break
-  }
-  
+  `,
+          -1
+        );
+        break;
+    }
   }
 }
 
@@ -723,5 +757,3 @@ function selectMenuItem(option) {
   editorApp.resetCode(editorApp.state.currentExample);
   document.querySelector(".dropdown-content").style.display = "none";
 }
-
-
