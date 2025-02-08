@@ -18,10 +18,9 @@ html {
   box-sizing: border-box;
   color: #ffffff;
   cursor: pointer;
-  display: inline-block;
-  font-size: 14px;
+  display: inline-flex; 
+  align-items: center;
   height: 30px;
-  line-height: 16px;
   list-style: none;
   outline: none;
   padding: 7px 10px;
@@ -54,6 +53,10 @@ html {
   align-items: center;
   justify-content: space-around;
 }
+.title-container {
+  display: flex;
+  align-items: center;
+}
 .runButton {
   margin: 5px;
 }
@@ -68,7 +71,7 @@ html {
 
 .header h2 {
   margin-left: 20px;
-  margin-right: 40px;
+  margin-right: 10px;
 }
 
 .container {
@@ -218,8 +221,7 @@ textarea {
   }
   .header h2,
   .button-container {
-    margin-left: 8px;
-    margin-right: 0px;
+    margin-right: 4px;
   }
 
   #editor,
@@ -245,4 +247,12 @@ textarea {
   .semi-height{
     height: auto;
   }
+  #button-reset {
+    display: none;
+  }
+}
+
+.shortcuts {
+  font-size: 9px;  
+  vertical-align: middle;
 }
