@@ -405,9 +405,7 @@ class Editor {
       case 2:
         this.editor.setValue(
           `package main
-
 import "fmt"
-
 func fibonacci(n int) {
     a, b := 0, 1
     fmt.Printf("Fibonacci(%d) = %d\n", 0, a)
@@ -420,9 +418,8 @@ func fibonacci(n int) {
         fmt.Printf("Fibonacci(%d) = %d\n", i, b)
     }
 }
-
 func main() {
-    n := 15
+    n := 20
     fibonacci(n)
 }`,
           -1
