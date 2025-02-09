@@ -63,8 +63,8 @@ func main() {
 	})
 
 	workDir, _ := os.Getwd()
-	filesDir := http.Dir(filepath.Join(workDir, "/static"))
-	http.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(filesDir)))
+	filesDir := http.Dir(filepath.Join(workDir, "static"))
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(filesDir)))
 
 	log.Fatal(http.ListenAndServe(":8088", nil))
 }
