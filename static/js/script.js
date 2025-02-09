@@ -410,14 +410,14 @@ import "fmt"
 
 func fibonacci(n int) {
     a, b := 0, 1
-    fmt.Printf("Fibonacci(%d) = %d\n", 0, a)
+    fmt.Printf("Fibonacci(%d) = %d\\n", 0, a)
     if n == 0 {
         return
     }
-    fmt.Printf("Fibonacci(%d) = %d\n", 1, b)
+    fmt.Printf("Fibonacci(%d) = %d\\n", 1, b)
     for i := 2; i <= n; i++ {
         a, b = b, a+b
-        fmt.Printf("Fibonacci(%d) = %d\n", i, b)
+        fmt.Printf("Fibonacci(%d) = %d\\n", i, b)
     }
 }
 
