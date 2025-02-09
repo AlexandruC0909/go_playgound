@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/AlexandruC0909/playground/internal/config"
 	"github.com/AlexandruC0909/playground/internal/docker"
 	"github.com/AlexandruC0909/playground/internal/handlers"
@@ -46,25 +48,27 @@ func main() {
 
 	log.Println("Starting HTTP server...")
 
-	http.HandleFunc("/", handlers.HandleHome)
-	http.HandleFunc("/run", func(w http.ResponseWriter, r *http.Request) {
+	r := chi.NewRouter()
+
+	r.Get("/", handlers.HandleHome)
+	r.Post("/run", func(w http.ResponseWriter, r *http.Request) {
 		handlers.HandleRun(w, r, rateLimiter, &activeSessions, executor)
 	})
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		handlers.HandleHealth(w, r, containerID, localClient)
 	})
-	http.HandleFunc("/save", handlers.HandleSave)
-	http.HandleFunc("/robots.txt", handlers.HandleRobots)
-	http.HandleFunc("/program-output", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/save", handlers.HandleSave)
+	r.Get("/robots.txt", handlers.HandleRobots)
+	r.Get("/program-output", func(w http.ResponseWriter, r *http.Request) {
 		handlers.HandleProgramOutput(w, r, &activeSessions)
 	})
-	http.HandleFunc("/send-input", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/send-input", func(w http.ResponseWriter, r *http.Request) {
 		handlers.HandleSendInput(w, r, &activeSessions)
 	})
 
 	workDir, _ := os.Getwd()
 	filesDir := http.Dir(filepath.Join(workDir, "static"))
-	http.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(filesDir)))
+	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(filesDir)))
 
-	log.Fatal(http.ListenAndServe(":8088", nil))
+	log.Fatal(http.ListenAndServe(":8088", r))
 }
