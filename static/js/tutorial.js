@@ -85,8 +85,12 @@ document.addEventListener("DOMContentLoaded", function () {
     modal.style.top = `${top}px`;
     modal.style.left = `${left}px`;
 
-    nextButton.textContent =
-      currentStep === tutorialSteps.length - 1 ? "Finish" : "Next";
+    if (currentStep === tutorialSteps.length - 1) {
+      nextButton.style.display = "none";
+    } else {
+      nextButton.style.display = "block";
+      nextButton.textContent = "Next";
+    }
   }
 
   function nextStep() {
