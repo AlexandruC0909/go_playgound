@@ -248,6 +248,9 @@ textarea {
   #button-reset {
     display: none;
   }
+  #button-format {
+    display: none;
+  }
 }
 
 .shortcuts {

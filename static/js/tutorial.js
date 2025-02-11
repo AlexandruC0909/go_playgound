@@ -17,13 +17,16 @@ document.addEventListener("DOMContentLoaded", function () {
       description: "Execute your Go code and see the results instantly.",
       position: "bottom",
     },
-    {
+  ];
+
+  if (window.innerWidth >= 768) {
+    tutorialSteps.push({
       element: "#button-reset",
       title: "Reset Code",
       description: "Use this button to reset your code to the default state.",
       position: "bottom",
-    },
-  ];
+    });
+  }
 
   let currentStep = 0;
   const overlay = document.getElementById("tutorial-overlay");
