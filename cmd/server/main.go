@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -24,6 +25,25 @@ var (
 	executor       *docker.Executor
 	activeSessions = sync.Map{}
 )
+
+func init() {
+	mime.AddExtensionType(".js", "application/javascript")
+	mime.AddExtensionType(".css", "text/css")
+	mime.AddExtensionType(".html", "text/html")
+}
+
+func fileServer(root http.FileSystem) http.Handler {
+	fs := http.FileServer(root)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ext := filepath.Ext(r.URL.Path)
+		
+		if mimeType := mime.TypeByExtension(ext); mimeType != "" {
+			w.Header().Set("Content-Type", mimeType)
+		}
+		
+		fs.ServeHTTP(w, r)
+	})
+}
 
 func main() {
 	log.Println("Starting Go Playground...")
@@ -70,8 +90,8 @@ func main() {
 	})
 
 	workDir, _ := os.Getwd()
-	filesDir := http.Dir(filepath.Join(workDir, "static"))
-	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(filesDir)))
+	filesDir := http.Dir(filepath.Join(workDir, "../../static"))
+	r.Handle("/static/*", http.StripPrefix("/static/", fileServer(filesDir)))
 
 	log.Println("Server starting on :8088")
 	log.Fatal(http.ListenAndServe(":8088", r))
