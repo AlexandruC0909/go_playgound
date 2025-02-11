@@ -31,9 +31,19 @@ document.addEventListener("DOMContentLoaded", function () {
   const description = document.getElementById("tutorial-description");
   const nextButton = document.getElementById("tutorial-next");
   const neverShowButton = document.getElementById("never-show");
+  const startTutorialButton = document.getElementById("start-tutorial");
+  const initialModal = document.getElementById("initial-modal");
+  const finishTutorialButton = document.getElementById("finish-tutorial");
+
+  function showInitialModal() {
+    overlay.style.display = "block";
+    initialModal.style.display = "block";
+    modal.style.display = "none";
+  }
 
   function showTutorial() {
-    overlay.style.display = "block";
+    initialModal.style.display = "none";
+    modal.style.display = "block";
     updateTutorialStep();
   }
 
@@ -104,6 +114,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   nextButton.addEventListener("click", nextStep);
   neverShowButton.addEventListener("click", neverShowTutorial);
-
-  showTutorial();
+  startTutorialButton.addEventListener("click", showTutorial);
+  finishTutorialButton.addEventListener("click", endTutorial);
+  showInitialModal();
 });

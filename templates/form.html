@@ -63,17 +63,28 @@ func main() {
   </div>
   </div>
   <div class="tutorial-overlay" id="tutorial-overlay">
-    <div class="tutorial-modal" id="tutorial-modal">
-      <div class="tutorial-content">
-        <h3 class="tutorial-title">Welcome to Go Playground!</h3>
-        <p class="tutorial-description" id="tutorial-description">Let's start with our Examples button where you can find various code samples.</p>
-        <div class="tutorial-buttons">
-          <button class="tutorial-button" id="never-show">Never show again</button>
-          <button class="tutorial-button primary" id="tutorial-next">Start Tutorial</button>
-        </div>
+  <div class="tutorial-modal centered" id="initial-modal">
+    <div class="tutorial-content">
+      <h3 class="tutorial-title">Welcome to Go Playground!</h3>
+      <p class="tutorial-description">Would you like to take a tutorial to learn about the features?</p>
+      <div class="tutorial-buttons">
+        <button class="tutorial-button" id="never-show">Never show again</button>
+        <button class="tutorial-button primary" id="start-tutorial">Start Tutorial</button>
       </div>
     </div>
   </div>
+  <div class="tutorial-modal" id="tutorial-modal" style="display: none;">
+    <div class="tutorial-content">
+      <h3 class="tutorial-title"></h3>
+      <p class="tutorial-description" id="tutorial-description"></p>
+      <div class="tutorial-buttons">
+        <button class="tutorial-button" id="finish-tutorial">Finish Tutorial</button>
+        <button class="tutorial-button primary" id="tutorial-next">Next</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 
 <script src="/static/js/ace.js"></script>
