@@ -1,4 +1,3 @@
-// Constants
 const EDITOR_CONFIG = {
   theme: "ace/theme/cobalt",
   mode: "ace/mode/golang",
@@ -38,7 +37,6 @@ class Editor {
   }
 
   init() {
-    // Setup accessibility
     document.addEventListener("DOMContentLoaded", () => {
       const textarea = document.querySelector(".ace_text-input");
       if (textarea) {
@@ -46,7 +44,6 @@ class Editor {
       }
     });
 
-    // Initialize Ace editor
     this.editor = ace.edit("editor");
     this.configureEditor();
     this.setupCommands();
@@ -92,7 +89,6 @@ class Editor {
     );
   }
 
-  // Column position helper
   findCorrespondingColumn(originalLine, formattedLine, originalColumn) {
     if (!originalLine || !formattedLine) return 0;
 
@@ -136,7 +132,6 @@ class Editor {
     return formattedLine.length;
   }
 
-  // Core functionality
   async saveCode() {
     const code = this.editor.getValue();
     const cursorPosition = this.editor.getCursorPosition();
@@ -160,7 +155,6 @@ class Editor {
 
       this.editor.setValue(formattedCode, -1);
 
-      // Restore cursor position
       if (cursorPosition.row < formattedLines.length) {
         const formattedColumn = this.findCorrespondingColumn(
           originalLines[cursorPosition.row],
@@ -178,7 +172,6 @@ class Editor {
         });
       }
 
-      // Restore selection if existed
       if (hasSelection && selectionRange) {
         this.editor.selection.setRange(selectionRange);
       } else {
@@ -321,7 +314,6 @@ class Editor {
     input.addEventListener("keypress", inputHandler);
   }
 
-  // Utility methods
   handleError(error) {
     this.outputDiv.innerHTML = "";
     this.outputDiv.classList.remove("success");
