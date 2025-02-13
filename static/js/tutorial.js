@@ -18,13 +18,7 @@ document.addEventListener("DOMContentLoaded", function () {
         "Click here to access various Go code examples and learn from them.",
       position: "bottom",
     },
-    {
-      element: "#button-format",
-      title: "Format Your Code",
-      description:
-        "Use this button to format your code according to the Go style guide.",
-      position: "bottom",
-    },
+
     {
       element: ".button-run",
       title: "Run Your Code",
@@ -32,13 +26,21 @@ document.addEventListener("DOMContentLoaded", function () {
       position: "bottom",
     },
   ];
-
-  tutorialSteps.splice(2, 0, {
-    element: "#button-reset",
-    title: "Reset Code",
-    description: "Use this button to reset your code to the default state.",
-    position: "bottom",
-  });
+  if (window.innerWidth >= 768) {
+    tutorialSteps.splice(2, 0, {
+      element: "#button-reset",
+      title: "Reset Code",
+      description: "Use this button to reset your code to the default state.",
+      position: "bottom",
+    });
+    tutorialSteps.splice(3, 0, {
+      element: "#button-format",
+      title: "Format Your Code",
+      description:
+        "Use this button to format your code according to the Go style guide.",
+      position: "bottom",
+    });
+  }
 
   let currentStep = 0;
   const overlay = document.getElementById("tutorial-overlay");
