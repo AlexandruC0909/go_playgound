@@ -5,6 +5,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const tutorialSteps = [
     {
+      element: "#editor",
+      title: "Code editor",
+      description:
+        "Write your Go code here. You can use the formatting and syntax highlighting features to make your code easier to read and write.",
+      position: "",
+    },
+    {
       element: ".button-example",
       title: "Examples",
       description:
@@ -33,6 +40,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const modal = document.getElementById("tutorial-modal");
   const description = document.getElementById("tutorial-description");
   const nextButton = document.getElementById("tutorial-next");
+  const previousButton = document.getElementById("tutorial-previous");
   const neverShowButton = document.getElementById("never-show");
   const startTutorialButton = document.getElementById("start-tutorial");
   const initialModal = document.getElementById("initial-modal");
@@ -83,6 +91,14 @@ document.addEventListener("DOMContentLoaded", function () {
       if (top + modalHeight > viewportHeight) {
         top = viewportHeight - modalHeight - 10;
       }
+    } else {
+      if (window.innerWidth >= 768) {
+        top = rect.top + 20;
+        left = rect.right + 20;
+      } else {
+        top = rect.bottom + 10;
+        left = 0;
+      }
     }
 
     modal.style.top = `${top}px`;
@@ -92,12 +108,21 @@ document.addEventListener("DOMContentLoaded", function () {
       nextButton.style.display = "none";
     } else {
       nextButton.style.display = "block";
-      nextButton.textContent = "Next";
+    }
+
+    if (currentStep === 0) {
+      previousButton.style.display = "none";
+    } else {
+      previousButton.style.display = "block";
     }
   }
 
-  function nextStep() {
-    currentStep++;
+  function changeStep(direction) {
+    if (direction === "next") {
+      currentStep++;
+    } else if (direction === "previous") {
+      currentStep--;
+    }
     if (currentStep >= tutorialSteps.length) {
       endTutorial();
     } else {
@@ -118,8 +143,8 @@ document.addEventListener("DOMContentLoaded", function () {
     localStorage.setItem("tutorialShown", "never");
     endTutorial();
   }
-
-  nextButton.addEventListener("click", nextStep);
+  nextButton.addEventListener("click", () => changeStep("next"));
+  previousButton.addEventListener("click", () => changeStep("previous"));
   neverShowButton.addEventListener("click", neverShowTutorial);
   startTutorialButton.addEventListener("click", showTutorial);
   finishTutorialButton.addEventListener("click", endTutorial);
