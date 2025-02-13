@@ -130,18 +130,23 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  function endTutorial() {
+  function endTutorial(neverShow = false) {
     overlay.style.display = "none";
     const highlight = document.querySelector(".tutorial-highlight");
     if (highlight) {
       highlight.classList.remove("tutorial-highlight");
     }
-    localStorage.setItem("tutorialShown", "yes");
+
+    if (neverShow === true) {
+      localStorage.setItem("tutorialShown", "never");
+    } else {
+      localStorage.setItem("tutorialShown", "yes");
+    }
   }
 
   function neverShowTutorial() {
     localStorage.setItem("tutorialShown", "never");
-    endTutorial();
+    endTutorial(true);
   }
   nextButton.addEventListener("click", () => changeStep("next"));
   previousButton.addEventListener("click", () => changeStep("previous"));
