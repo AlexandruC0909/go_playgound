@@ -48,6 +48,8 @@ class Editor {
     this.configureEditor();
     this.setupCommands();
     this.setupDropdownEvents();
+    this.editor.focus();
+    this.editor.navigateFileEnd();
   }
 
   configureEditor() {

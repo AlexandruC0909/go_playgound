@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
-  if (localStorage.getItem("tutorialShown") === "never") {
+  if (localStorage.getItem("hideTutorial") === "true") {
     return;
   }
 
@@ -19,6 +19,13 @@ document.addEventListener("DOMContentLoaded", function () {
       position: "bottom",
     },
     {
+      element: "#button-format",
+      title: "Format Your Code",
+      description:
+        "Use this button to format your code according to the Go style guide.",
+      position: "bottom",
+    },
+    {
       element: ".button-run",
       title: "Run Your Code",
       description: "Execute your Go code and see the results instantly.",
@@ -26,14 +33,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   ];
 
-  if (window.innerWidth >= 768) {
-    tutorialSteps.push({
-      element: "#button-reset",
-      title: "Reset Code",
-      description: "Use this button to reset your code to the default state.",
-      position: "bottom",
-    });
-  }
+  tutorialSteps.splice(2, 0, {
+    element: "#button-reset",
+    title: "Reset Code",
+    description: "Use this button to reset your code to the default state.",
+    position: "bottom",
+  });
 
   let currentStep = 0;
   const overlay = document.getElementById("tutorial-overlay");
@@ -45,7 +50,6 @@ document.addEventListener("DOMContentLoaded", function () {
   const startTutorialButton = document.getElementById("start-tutorial");
   const initialModal = document.getElementById("initial-modal");
   const finishTutorialButton = document.getElementById("finish-tutorial");
-
   function showInitialModal() {
     overlay.style.display = "block";
     initialModal.style.display = "block";
@@ -131,26 +135,23 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function endTutorial(neverShow = false) {
+    aceEditor = ace.edit("editor");
+    aceEditor.focus();
+    aceEditor.navigateFileEnd();
     overlay.style.display = "none";
     const highlight = document.querySelector(".tutorial-highlight");
     if (highlight) {
       highlight.classList.remove("tutorial-highlight");
     }
-
+    aceEditor.focus();
     if (neverShow === true) {
-      localStorage.setItem("tutorialShown", "never");
-    } else {
-      localStorage.setItem("tutorialShown", "yes");
+      localStorage.setItem("hideTutorial", "true");
     }
   }
 
-  function neverShowTutorial() {
-    localStorage.setItem("tutorialShown", "never");
-    endTutorial(true);
-  }
   nextButton.addEventListener("click", () => changeStep("next"));
   previousButton.addEventListener("click", () => changeStep("previous"));
-  neverShowButton.addEventListener("click", neverShowTutorial);
+  neverShowButton.addEventListener("click", () => endTutorial(true));
   startTutorialButton.addEventListener("click", showTutorial);
   finishTutorialButton.addEventListener("click", endTutorial);
   showInitialModal();
