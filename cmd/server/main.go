@@ -90,7 +90,7 @@ func main() {
 	})
 
 	workDir, _ := os.Getwd()
-	filesDir := http.Dir(filepath.Join(workDir, "../../static"))
+	filesDir := http.Dir(filepath.Join(workDir, "static"))
 	r.Handle("/static/*", http.StripPrefix("/static/", fileServer(filesDir)))
 
 	log.Println("Server starting on :8088")
