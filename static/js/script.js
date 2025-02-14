@@ -596,12 +596,8 @@ func main() {
         );
         break;
       case 7:
-        // Calculate window dimensions
-        const outputDiv = document.getElementById("output");
-        const rect = outputDiv.getBoundingClientRect();
-
-        const cols = Math.floor(rect.width / 2);
-        const rows = Math.floor(rect.height / 5);
+        const cols = Math.floor(window.innerWidth / 8);
+        const rows = Math.floor(window.innerHeight / 32);
 
         this.editor.setValue(
           `package main
@@ -692,9 +688,9 @@ func main() {
         
         func main() {
         l := NewLife(${cols}, ${rows})
-        for i := 0; i < 300; i++ {
+        for i := 0; i < 75; i++ {
           l.Step()
-          fmt.Print("", l) // Clear screen and print field.
+          fmt.Print("\\x0c", l)  // Clear screen before each update
           time.Sleep(time.Second / 10)
         }
         }`,
