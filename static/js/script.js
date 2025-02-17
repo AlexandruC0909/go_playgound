@@ -600,9 +600,7 @@ func main() {
         const rows = Math.floor(window.innerHeight / 56);
 
         this.editor.setValue(
-          `// An implementation of Conway's Game of Life.
-  package main
-  
+          `package main
   import (
   "bytes"
   "fmt"
@@ -682,7 +680,7 @@ func main() {
       }
       buf.WriteByte(b)
     }
-    buf.WriteByte('\\n') // Corrected newline character
+    buf.WriteByte('\\n')
   }
   return buf.String()
   }
@@ -691,7 +689,7 @@ func main() {
   l := NewLife(${cols},${rows})
   for i := 0; i < 75; i++ {
     l.Step()
-    fmt.Print("", l) // Clear screen and print field.
+    fmt.Print("", l)
     time.Sleep(time.Second / 10)
   }
   }`,
