@@ -344,6 +344,7 @@ class Editor {
 
   cleanupPreviousSession() {
     this.outputDiv.innerHTML = "";
+    this.outputDiv.classList.remove("error", "success", "invalid");
     this.inputSection.classList.remove("display");
     this.inputSection.classList.add("display-none");
 
