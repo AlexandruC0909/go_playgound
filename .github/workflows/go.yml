@@ -30,7 +30,7 @@ jobs:
           
       - name: Copy program to server
         run: |
-          scp -o StrictHostKeyChecking=no ./main $SERVER_USERNAME@$SERVER_IP:/usr/local/playground
+          scp -o StrictHostKeyChecking=no -r ./main ./static $SERVER_USERNAME@$SERVER_IP:/usr/local/playground
         env:
           SERVER_USERNAME: ${{ secrets.SERVER_USERNAME }}
           SERVER_IP: ${{ secrets.SERVER_IP }}

@@ -188,6 +188,9 @@ class Editor {
     this.cleanupPreviousSession();
     const code = this.editor.getValue();
 
+    this.outputDiv.classList.remove("error", "success", "invalid");
+    this.outputDiv.classList.add("building");
+
     try {
       const response = await fetch("/run", {
         method: "POST",
@@ -247,6 +250,7 @@ class Editor {
     this.updateInputSection(data.waitingForInput);
 
     if (data.done) {
+      this.outputDiv.classList.remove("building");
       this.handleProgramCompletion();
     }
   }
@@ -318,14 +322,14 @@ class Editor {
 
   handleError(error) {
     this.outputDiv.innerHTML = "";
-    this.outputDiv.classList.remove("success");
+    this.outputDiv.classList.remove("building", "success");
     this.outputDiv.classList.add("error");
     console.error("Error:", error);
     this.outputDiv.innerHTML += `<div class="error">Error: ${error.message}</div>`;
   }
 
   handleOutputError(error) {
-    this.outputDiv.classList.remove("success");
+    this.outputDiv.classList.remove("success", "building");
     if (error.includes("invalid or potentially unsafe Go code")) {
       this.outputDiv.classList.add("invalid");
     } else {
@@ -336,7 +340,7 @@ class Editor {
   }
 
   handleProgramCompletion() {
-    this.outputDiv.classList.remove("error", "invalid");
+    this.outputDiv.classList.remove("error", "invalid", "building");
     this.outputDiv.classList.add("success");
     this.cleanupSession();
     this.outputDiv.innerHTML += `<div class="output-line finished-program">Program exited.</div>`;
@@ -380,9 +384,7 @@ class Editor {
 
   resetCode(example) {
     const output = document.getElementById("output");
-    output.classList.remove("error");
-    output.classList.remove("success");
-    output.classList.remove("invalid");
+    output.classList.remove("error", "success", "invalid", "building");
     output.textContent = "";
     switch (example) {
       case 1:
