@@ -1,37 +1,49 @@
 # Go Playground
 
-This project is a simple web-based Go playground. It allows you to write and run Go code directly in your browser.
+This project is an online code editor for the Go programming language. It provides a sandboxed environment where you can write, compile, and run Go code directly in your browser.
 
 ## Features
 
-- Write Go code in a "code editor"
-- Run the code and see the output in real-time
-- Error messages are displayed directly in the output area
+*   **Online Code Editor:** A user-friendly interface with the ACE code editor for writing Go code.
+*   **Sandboxed Execution:** Code is executed in an isolated Docker container to ensure safety and security.
+*   **Real-time Output:** View the output of your code in real-time as it executes.
+*   **Interactive Input:** Provide input to your programs through a dedicated input field.
+*   **Code Formatting:** Automatically format your Go code using the `gofmt` tool.
+*   **Examples:** A collection of example programs to help you get started with Go.
 
-### Prerequisites
+## Getting Started
 
-- Go must be installed on your machine. You can download it from [here](https://golang.org/dl/).
+To run the Go Playground locally, you will need to have Docker and Go installed on your machine.
 
-### Installing
+1.  **Clone the repository:**
 
-1. Clone the repository to your local machine
-```bash
-git clone https://github.com/AlexandruC0909/go_playgound.git
-```
-2. Navigate to the project directory
-```bash
-cd go_playground
-```
-3. Run the application
-```bash
-go run main.go
-```
-4. Open your web browser and navigate to `http://localhost:8080`
+    ```bash
+    git clone https://github.com/AlexandruC0909/playground.git
+    cd playground
+    ```
 
-## Built With
+2.  **Build the Docker image:**
 
-- [Go](https://golang.org/)
+    ```bash
+    docker build -t go-playground-img .
+    ```
 
-## License
+3.  **Run the application:**
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
+    ```bash
+    go run cmd/server/main.go
+    ```
+
+4.  **Open your browser and navigate to `http://localhost:8088`**
+
+## How it Works
+
+The Go Playground consists of a Go backend server and a simple HTML, CSS, and JavaScript frontend.
+
+*   **Backend:** The backend is built using the Go standard library and the `go-chi/chi` router. It handles HTTP requests, manages Docker containers, and executes user-submitted code.
+*   **Frontend:** The frontend is a single HTML page that uses the ACE editor for code editing. It communicates with the backend via AJAX requests to run code and display the output.
+*   **Docker:** The application uses Docker to create a secure sandbox for executing untrusted code. Each user session runs in a separate container to prevent interference between different users.
+
+## Contributing
+
+Contributions are welcome! If you find a bug or have a feature request, please open an issue on the GitHub repository.
