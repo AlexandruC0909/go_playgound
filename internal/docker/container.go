@@ -21,6 +21,7 @@ type ContainerConfig struct {
 	Name        string
 	Image       string
 	MemoryLimit int64
+	CPUQuota    int64
 	WorkDir     string
 }
 
@@ -87,7 +88,8 @@ func (c *Container) Ensure() error {
 		Resources: container.Resources{
 			Memory:     c.config.MemoryLimit,
 			MemorySwap: c.config.MemoryLimit,
-			NanoCPUs:   1000000000,
+			CPUQuota:   c.config.CPUQuota,
+			CPUPeriod:  100000,
 			PidsLimit:  &pidsLimit,
 		},
 		NetworkMode: "none",

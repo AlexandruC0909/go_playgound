@@ -36,11 +36,11 @@ func fileServer(root http.FileSystem) http.Handler {
 	fs := http.FileServer(root)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ext := filepath.Ext(r.URL.Path)
-		
+
 		if mimeType := mime.TypeByExtension(ext); mimeType != "" {
 			w.Header().Set("Content-Type", mimeType)
 		}
-		
+
 		fs.ServeHTTP(w, r)
 	})
 }
@@ -52,6 +52,7 @@ func main() {
 		Name:        config.ContainerName,
 		Image:       config.DockerImage,
 		MemoryLimit: config.MemoryLimit,
+		CPUQuota:    config.CPUQuota,
 		WorkDir:     "/code",
 	}
 

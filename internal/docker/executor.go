@@ -85,7 +85,7 @@ func (e *Executor) Compile(ctx context.Context, code string) error {
 
 func (e *Executor) Run(ctx context.Context, session *models.ProgramSession) error {
 	execConfig := container.ExecOptions{
-		Cmd:          []string{"go", "run", filepath.Join(e.workDir, "main.go")},
+		Cmd:          []string{"timeout", "5s", "go", "run", filepath.Join(e.workDir, "main.go")},
 		WorkingDir:   e.workDir,
 		AttachStdin:  true,
 		AttachStdout: true,
